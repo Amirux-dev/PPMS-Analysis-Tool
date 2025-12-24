@@ -483,15 +483,22 @@ def rename_batch_callback(batch_id, old_name):
             if st.session_state[key] == old_name:
                 st.session_state[key] = new_name
 
-def render_file_actions(file_data: Dict[str, Any], current_batch_id: int, all_batches_info: Dict[int, Dict[str, Any]]):
-    """Helper to render the Move/Delete actions for a file."""
-    # Ensure ID is a string
-    file_id = str(file_data.get('id', uuid.uuid4()))
-    
-    # Use a unique key for the popover based on file ID to prevent state leakage
-    # Note: Removed 'key' parameter from st.popover as it seems to cause TypeError in the user's environment
-    with st.popover("⋮", help="Manage File"):
-        st.markdown("**Move File**")
+# --- Dialog Definition for File Management ---
+# Using st.dialog (or experimental_dialog) to create a modal for file actions.
+# This avoids the "sticky popover" issue where the menu stays open on the wrong file after deletion.
+dialog_decorator = None
+if hasattr(st, "dialog"):
+    dialog_decorator = st.dialog
+elif hasattr(st, "experimental_dialog"):
+    dialog_decorator = st.experimental_dialog
+
+if dialog_decorator:
+    @dialog_decorator("Manage File")
+    def manage_file_dialog(file_data: Dict[str, Any], current_batch_id: int, all_batches_info: Dict[int, Dict[str, Any]]):
+        st.write(f"**File:** {file_data['fileName']}")
+        
+        st.markdown("---")
+        st.subheader("Move File")
         
         # Filter options: exclude current batch
         target_options = {bid: info['name'] for bid, info in all_batches_info.items() if bid != current_batch_id}
@@ -501,36 +508,80 @@ def render_file_actions(file_data: Dict[str, Any], current_batch_id: int, all_ba
              target_options[0] = "📄 File by file import"
         
         if target_options:
-            c_dest, c_go = st.columns([0.7, 0.3], vertical_alignment="bottom")
-            with c_dest:
-                target_bid = st.selectbox(
-                    "Target", 
-                    options=list(target_options.keys()), 
-                    format_func=lambda x: target_options[x], 
-                    key=f"mv_sel_{file_id}", 
-                    label_visibility="collapsed"
-                )
-            with c_go:
-                target_name = target_options[target_bid]
-                st.button(
-                    "Move", 
-                    key=f"mv_btn_{file_id}", 
-                    use_container_width=True, 
-                    on_click=move_file_callback, 
-                    args=(file_data['id'], target_bid, target_name)
-                )
+            target_bid = st.selectbox(
+                "Select Target Folder", 
+                options=list(target_options.keys()), 
+                format_func=lambda x: target_options[x], 
+                key=f"dlg_mv_sel_{file_data['id']}"
+            )
+            
+            target_name = target_options[target_bid]
+            if st.button("Confirm Move", key=f"dlg_mv_btn_{file_data['id']}", type="primary"):
+                move_file_callback(file_data['id'], target_bid, target_name)
+                st.rerun()
         else:
-            st.info("No other folders.")
+            st.info("No other folders to move to.")
 
-        st.markdown("<hr style='margin: 5px 0; border: none; border-top: 1px solid #f0f0f0;'>", unsafe_allow_html=True)
-        st.button(
-            "Delete File", 
-            key=f"rm_{file_id}", 
-            type="primary", 
-            use_container_width=True, 
-            on_click=delete_file_callback, 
-            args=(file_data['id'],)
-        )
+        st.markdown("---")
+        st.subheader("Delete File")
+        st.warning("This action cannot be undone.")
+        if st.button("Confirm Delete", key=f"dlg_rm_{file_data['id']}", type="primary"):
+            delete_file_callback(file_data['id'])
+            st.rerun()
+
+def render_file_actions(file_data: Dict[str, Any], current_batch_id: int, all_batches_info: Dict[int, Dict[str, Any]]):
+    """Helper to render the Move/Delete actions for a file."""
+    # Ensure ID is a string
+    file_id = str(file_data.get('id', uuid.uuid4()))
+    
+    # Use a Dialog if available (Robust against sticky state)
+    if dialog_decorator:
+        if st.button("⚙️", key=f"btn_manage_{file_id}", help="Manage File"):
+            manage_file_dialog(file_data, current_batch_id, all_batches_info)
+    else:
+        # Fallback for older Streamlit versions (might have sticky bug)
+        # Note: Removed 'key' parameter from st.popover as it seems to cause TypeError in the user's environment
+        with st.popover("⋮", help="Manage File"):
+            st.markdown("**Move File**")
+            
+            # Filter options: exclude current batch
+            target_options = {bid: info['name'] for bid, info in all_batches_info.items() if bid != current_batch_id}
+            
+            # Ensure "File by file" (0) is available if we are in a batch
+            if current_batch_id != 0:
+                 target_options[0] = "📄 File by file import"
+            
+            if target_options:
+                c_dest, c_go = st.columns([0.7, 0.3], vertical_alignment="bottom")
+                with c_dest:
+                    target_bid = st.selectbox(
+                        "Target", 
+                        options=list(target_options.keys()), 
+                        format_func=lambda x: target_options[x], 
+                        key=f"mv_sel_{file_id}", 
+                        label_visibility="collapsed"
+                    )
+                with c_go:
+                    target_name = target_options[target_bid]
+                    st.button(
+                        "Move", 
+                        key=f"mv_btn_{file_id}", 
+                        use_container_width=True, 
+                        on_click=move_file_callback, 
+                        args=(file_data['id'], target_bid, target_name)
+                    )
+            else:
+                st.info("No other folders.")
+
+            st.markdown("<hr style='margin: 5px 0; border: none; border-top: 1px solid #f0f0f0;'>", unsafe_allow_html=True)
+            st.button(
+                "Delete File", 
+                key=f"rm_{file_id}", 
+                type="primary", 
+                use_container_width=True, 
+                on_click=delete_file_callback, 
+                args=(file_data['id'],)
+            )
 
 # Data Management & Explorer
 datasets = st.session_state.all_datasets
