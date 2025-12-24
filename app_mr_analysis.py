@@ -519,6 +519,15 @@ st.markdown("Upload `.dat` files to visualize and analyze transport measurements
 # --- Sidebar: Data Manager ---
 st.sidebar.header("Data Manager")
 
+# Duplicate Strategy
+duplicate_strategy = st.sidebar.radio(
+    "Duplicate Handling:",
+    ["Skip", "Overwrite"],
+    index=0,
+    horizontal=True,
+    help="Choose 'Overwrite' to update existing files with the same name."
+)
+
 # File Uploader
 uploaded_files = st.sidebar.file_uploader(
     "Upload .dat files", 
@@ -555,8 +564,12 @@ if uploaded_files:
         batch_name = "📄 File by file import"
     
     new_files_count = 0
+    updated_files_count = 0
+    
     for uploaded_file in uploaded_files:
-        if any(d['fileName'] == uploaded_file.name for d in st.session_state.all_datasets):
+        existing_file = next((d for d in st.session_state.all_datasets if d['fileName'] == uploaded_file.name), None)
+        
+        if existing_file and duplicate_strategy == "Skip":
             continue
             
         try:
@@ -566,14 +579,25 @@ if uploaded_files:
             data['batch_id'] = batch_id
             data['batch_name'] = batch_name 
             
-            st.session_state.all_datasets.append(data)
-            new_files_count += 1
+            if existing_file and duplicate_strategy == "Overwrite":
+                # Preserve ID to keep plots alive
+                data['id'] = existing_file['id']
+                # Replace in list
+                idx = st.session_state.all_datasets.index(existing_file)
+                st.session_state.all_datasets[idx] = data
+                updated_files_count += 1
+            else:
+                st.session_state.all_datasets.append(data)
+                new_files_count += 1
         except Exception as e:
             st.error(f"Error parsing {uploaded_file.name}: {e}")
     
-    if new_files_count > 0:
+    if new_files_count > 0 or updated_files_count > 0:
         save_session_state()
-        st.sidebar.success(f"Added {new_files_count} new files.")
+        msg = []
+        if new_files_count > 0: msg.append(f"{new_files_count} added")
+        if updated_files_count > 0: msg.append(f"{updated_files_count} updated")
+        st.sidebar.success(f"Done: {', '.join(msg)}.")
         st.session_state.uploader_key += 1
         st.rerun()
 
@@ -1003,6 +1027,7 @@ if datasets or batches:
 **Author :** Amir MEDDAS  
 *LPS - Laboratoire de Physique des Solides*                                              
 *C2N - Centre de Nanosciences et de Nanotechnologies*    
+                        
 [![LinkedIn](https://img.shields.io/badge/LinkedIn-0077B5?style=for-the-badge&logo=linkedin&logoColor=white)](https://www.linkedin.com/in/amir-meddas-80876424b/)
 """)
 
@@ -1013,6 +1038,7 @@ else:
 **Author :** Amir MEDDAS  
 *LPS - Laboratoire de Physique des Solides*                                                                
 *C2N - Centre de Nanosciences et de Nanotechnologies*  
+                        
 [![LinkedIn](https://img.shields.io/badge/LinkedIn-0077B5?style=for-the-badge&logo=linkedin&logoColor=white)](https://www.linkedin.com/in/amir-meddas-80876424b/)
 """)
     st.stop()
@@ -1361,7 +1387,7 @@ def create_plot_interface(plot_id: str, available_datasets: List[Dict[str, Any]]
 
         # Row 2: Processing - Harmonized UI
         st.markdown("###### Processing & Fits")
-        c_smooth, c_fit1, c_fit2, c_proc = st.columns(4, vertical_alignment="center")
+        c_smooth, c_fit1, c_fit2, c_proc = st.columns(4, vertical_alignment="bottom")
         
         with c_smooth:
             smooth_window = persistent_input(st.number_input, f"smooth_{plot_id}", label="Smoothing (pts)", min_value=0, value=0, step=1, help="Moving average window size.")
@@ -1375,7 +1401,7 @@ def create_plot_interface(plot_id: str, available_datasets: List[Dict[str, Any]]
         with c_proc:
             symmetrize_files = []
             if analysis_mode in ["Standard MR Analysis", "Standard R-H Analysis"]:
-                with st.popover("🪞 Symmetrize"):
+                with st.popover("🪞 Symmetrize", use_container_width=True):
                     st.markdown("Select files to symmetrize:")
                     # Create options map: ID -> Filename
                     sym_options = {d['id']: d['fileName'] for d in selected_datasets}
