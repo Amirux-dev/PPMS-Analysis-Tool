@@ -12,6 +12,19 @@ import os
 import uuid
 from typing import List, Dict, Any, Optional, Tuple
 
+# Set page config to wide mode by default
+st.set_page_config(layout="wide", page_title="PPMS Analysis Tool")
+
+# Inject CSS for Left-Aligned Popover Buttons
+st.markdown("""
+<style>
+    div[data-testid="stPopover"] > button {
+        justify-content: start;
+        text-align: left;
+    }
+</style>
+""", unsafe_allow_html=True)
+
 # -----------------------------------------------------------------------------
 # DATA PARSING & EXTRACTION
 # -----------------------------------------------------------------------------
@@ -1032,14 +1045,14 @@ def create_plot_interface(plot_id: str, available_datasets: List[Dict[str, Any]]
 
         # --- Legend Customization ---
         custom_legends = {}
-        with st.expander("🖊️ Legend Labels", expanded=False):
+        with st.popover("🖊️ Legend Labels", width='stretch'):
             for d in selected_datasets:
                 default_leg = d['label']
                 custom_leg = st.text_input(f"Label for {d['fileName']}", value=default_leg, key=f"leg_{plot_id}_{d['id']}")
                 custom_legends[d['id']] = custom_leg
 
         # --- Customization ---
-        with st.expander("🎨 Plot Customization", expanded=False):
+        with st.popover("🎨 Plot Customization", width='stretch'):
             # Row 1: Titles & Theme
             col_cust1, col_cust2, col_cust3 = st.columns(3)
             with col_cust1:
