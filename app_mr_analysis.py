@@ -16,6 +16,7 @@ from typing import List, Dict, Any, Optional, Tuple
 st.set_page_config(layout="wide", page_title="PPMS Analysis Tool")
 
 
+
 # -----------------------------------------------------------------------------
 # DATA PARSING & EXTRACTION
 # -----------------------------------------------------------------------------
@@ -931,6 +932,16 @@ def remove_plot_callback(plot_id_str):
         
         for key in keys_to_del:
             del st.session_state[key]
+            
+        # Cleanup persistent values
+        if 'persistent_values' in st.session_state:
+            p_store = st.session_state['persistent_values']
+            p_keys_to_del = []
+            for key in p_store.keys():
+                if key.endswith(f"_{pid}") or f"_{pid}_" in key:
+                    p_keys_to_del.append(key)
+            for key in p_keys_to_del:
+                del p_store[key]
 
 def duplicate_plot_callback(plot_id):
     existing_ids = set(st.session_state.plot_ids)
@@ -938,6 +949,20 @@ def duplicate_plot_callback(plot_id):
     while new_id in existing_ids:
         new_id += 1
     st.session_state.plot_ids.append(new_id)
+    
+    # Copy persistent values
+    if 'persistent_values' in st.session_state:
+        p_store = st.session_state['persistent_values']
+        new_entries = {}
+        for key, val in p_store.items():
+            if key.endswith(f"_{plot_id}"):
+                base = key[:-len(str(plot_id))] # remove old id
+                new_key = f"{base}{new_id}"
+                new_entries[new_key] = val
+            elif f"_{plot_id}_" in key:
+                new_key = key.replace(f"_{plot_id}_", f"_{new_id}_")
+                new_entries[new_key] = val
+        p_store.update(new_entries)
     
     # Copy state
     for key in list(st.session_state.keys()):
@@ -986,18 +1011,18 @@ def create_plot_interface(plot_id: str, available_datasets: List[Dict[str, Any]]
                 plot_name = st.session_state.get(f"pname_{plot_id}", f"Plot {plot_id}")
                 st.markdown(f"<h3 style='margin: 0; padding: 0; line-height: 1.5;'>{plot_name}</h3>", unsafe_allow_html=True)
             with c_h_edit:
-                with st.popover("✏️", help="Rename Plot", width='stretch'):
+                with st.popover("✏️", help="Rename Plot", width="stretch"):
                     st.text_input("Name", value=plot_name, key=f"pname_{plot_id}")
         
         with c_head_actions:
             # Action Buttons
             b_add, b_rem, b_dup = st.columns(3)
             with b_add:
-                st.button("➕", key=f"add_btn_{plot_id}", help="Add a new plot", on_click=add_plot_callback, width='stretch')
+                st.button("➕", key=f"add_btn_{plot_id}", help="Add a new plot", on_click=add_plot_callback, use_container_width=True)
             with b_rem:
-                st.button("➖", key=f"del_btn_{plot_id}", help="Remove this plot", on_click=remove_plot_callback, args=(plot_id,), width='stretch')
+                st.button("➖", key=f"del_btn_{plot_id}", help="Remove this plot", on_click=remove_plot_callback, args=(plot_id,), use_container_width=True)
             with b_dup:
-                st.button("📋", key=f"dup_{plot_id}", help="Duplicate this plot", on_click=duplicate_plot_callback, args=(plot_id,), width='stretch')
+                st.button("📋", key=f"dup_{plot_id}", help="Duplicate this plot", on_click=duplicate_plot_callback, args=(plot_id,), use_container_width=True)
         
         # Row 0: Analysis Mode
         analysis_mode = persistent_selectbox(
