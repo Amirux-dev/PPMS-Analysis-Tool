@@ -17,18 +17,22 @@
 #### 📊 Visualization & Analysis
 *   **Interactive Plotting**: Built on Plotly for fluid exploration (zoom, pan, hover, select).
 *   **Analysis Modes**:
-    *   **Standard MR Analysis**: Automatic calculation of MR (%), symmetrization of R(H) loops, derivative calculation (dR/dH).
+    *   **Standard MR Analysis**: Automatic calculation of MR (%), symmetrization of R(H) loops (Mirror $H \rightarrow -H$), derivative calculation (dR/dH).
     *   **Standard R-T Analysis**: R vs T plots, Normalization R/R(300K), derivative calculation (dR/dT).
     *   **Custom Columns**: Full flexibility to plot any column against another from your data files.
 *   **Data Processing**:
     *   Moving average smoothing.
-    *   Symmetrization of magnetoresistance loops.
-    *   Linear fitting tools.
+    *   **Selective Symmetrization**: Choose specific curves to symmetrize directly from the plot interface.
+    *   Linear and Parabolic fitting tools.
 
 #### 🗂️ File Management
 *   **Batch Organization**: Create virtual "Batches" to organize measurements by sample, date, or experiment.
-*   **Batch Actions**: Move or delete multiple files simultaneously.
+*   **Smart Duplicate Handling**: Choose to **Skip** or **Overwrite** duplicate files during upload. Overwriting preserves active plots.
+*   **Batch Actions**: Move or delete multiple files simultaneously with **Folder Filtering**.
 *   **Smart Metadata**: Automatic extraction of Temperature, Field, and Sample Name from filenames.
+
+#### 💾 Session Persistence
+*   **Auto-Save**: Your analysis state (plots, selections, data) is automatically saved. You can refresh the page without losing your work.
 
 #### 📤 Export
 *   **Images**: Export high-resolution plots (PNG).
@@ -75,18 +79,22 @@ It looks for patterns like `T=...K`, `...K`, `...T` (Tesla), or `...Oe`.
 #### 📊 Visualisation & Analyse
 *   **Graphiques Interactifs** : Basé sur Plotly pour une exploration fluide (zoom, sélection, survol).
 *   **Modes d'Analyse** :
-    *   **Standard MR Analysis** : Calcul automatique de la MR (%), symétrisation des courbes R(H), calcul de dérivées (dR/dH).
+    *   **Standard MR Analysis** : Calcul automatique de la MR (%), symétrisation des courbes R(H) (Miroir $H \rightarrow -H$), calcul de dérivées (dR/dH).
     *   **Standard R-T Analysis** : R vs T, Normalisation R/R(300K), dérivées (dR/dT).
     *   **Custom Columns** : Liberté totale pour tracer n'importe quelle colonne du fichier `.dat`.
 *   **Traitement de Données** :
     *   Lissage (Smoothing) par fenêtre glissante.
-    *   Symétrisation des boucles de magnétorésistance.
-    *   Ajustement linéaire (Linear Fit).
+    *   **Symétrisation Sélective** : Choisissez quelles courbes symétriser directement depuis l'interface.
+    *   Ajustement linéaire et parabolique.
 
 #### 🗂️ Gestion de Fichiers
 *   **Organisation par Dossiers** : Créez des "Batches" virtuels pour organiser vos mesures par échantillon ou par date.
-*   **Actions par Lot** : Déplacez ou supprimez plusieurs fichiers simultanément.
+*   **Gestion des Doublons** : Choisissez d'**Ignorer** ou d'**Écraser** les fichiers existants lors de l'upload. L'écrasement met à jour les graphiques en temps réel.
+*   **Actions par Lot** : Déplacez ou supprimez plusieurs fichiers simultanément avec **Filtrage par Dossier**.
 *   **Détection de Métadonnées** : Extraction automatique de la Température, du Champ et du nom de l'échantillon depuis le nom du fichier.
+
+#### 💾 Persistance de Session
+*   **Sauvegarde Automatique** : Votre état d'analyse (graphiques, sélections, données) est sauvegardé automatiquement. Vous pouvez rafraîchir la page sans perdre votre travail.
 
 #### 📤 Export
 *   **Images** : Export des graphiques en haute résolution (PNG).
