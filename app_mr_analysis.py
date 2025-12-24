@@ -846,8 +846,8 @@ def duplicate_plot_callback(plot_id):
             new_key = key.replace(f"_{plot_id}_", f"_{new_id}_")
             st.session_state[new_key] = st.session_state[key]
 
-def get_batch_options(datasets: List[Dict[str, Any]], custom_batches: Dict[int, str] = None) -> List[str]:
-    """Returns a stable list of batch names for dropdowns."""
+def get_batch_map(datasets: List[Dict[str, Any]], custom_batches: Dict[int, str] = None) -> Dict[Any, str]:
+    """Returns a mapping of batch_id to batch_name."""
     unique_batches = {}
     
     # 1. From Datasets
@@ -861,9 +861,7 @@ def get_batch_options(datasets: List[Dict[str, Any]], custom_batches: Dict[int, 
         for bid, bname in custom_batches.items():
             unique_batches[bid] = bname
     
-    # Sort by ID for stability
-    sorted_ids = sorted(unique_batches.keys())
-    return ["All Folders"] + [unique_batches[bid] for bid in sorted_ids]
+    return unique_batches
 
 def create_plot_interface(plot_id: str, available_datasets: List[Dict[str, Any]], width: int, height: int) -> Optional[go.Figure]:
     """Creates a self-contained plotting interface and returns the figure."""
@@ -902,22 +900,45 @@ def create_plot_interface(plot_id: str, available_datasets: List[Dict[str, Any]]
         
         # --- Unified File Selection ---
         # Filter by Folder (Batch)
-        batch_options = get_batch_options(available_datasets, st.session_state.get('custom_batches', {}))
+        batch_map = get_batch_map(available_datasets, st.session_state.get('custom_batches', {}))
         
-        # Validate and Fix Batch Selection in Session State
+        # Options: "ALL" + sorted IDs
+        batch_ids = sorted(batch_map.keys())
+        options = ["ALL"] + batch_ids
+        
+        def format_batch(option):
+            if option == "ALL":
+                return "All Folders"
+            return batch_map.get(option, f"Batch {option}")
+
+        # Migration: Check if current value is a string (old name)
         current_batch_key = f"batch_filter_{plot_id}"
-        if current_batch_key in st.session_state:
-            if st.session_state[current_batch_key] not in batch_options:
-                st.session_state[current_batch_key] = "All Folders"
+        current_val = st.session_state.get(current_batch_key)
         
-        selected_batch_name = st.selectbox(
+        # If value is a string (old name) or invalid, try to migrate or reset
+        if (isinstance(current_val, str) and current_val != "ALL" and current_val not in options) or (current_val not in options and current_val is not None):
+            # Try to find the ID for this name (Migration)
+            found_id = "ALL"
+            if isinstance(current_val, str):
+                for bid, bname in batch_map.items():
+                    if bname == current_val:
+                        found_id = bid
+                        break
+            st.session_state[current_batch_key] = found_id
+        
+        # Final Validation
+        if st.session_state.get(current_batch_key) not in options:
+             st.session_state[current_batch_key] = "ALL"
+        
+        selected_batch_id = st.selectbox(
             "Filter by Folder", 
-            batch_options, 
+            options, 
+            format_func=format_batch,
             key=current_batch_key
         )
         
-        if selected_batch_name != "All Folders":
-            filtered_datasets = [d for d in available_datasets if d.get('batch_name') == selected_batch_name]
+        if selected_batch_id != "ALL":
+            filtered_datasets = [d for d in available_datasets if d.get('batch_id') == selected_batch_id]
         else:
             filtered_datasets = available_datasets
 
@@ -1504,11 +1525,20 @@ for row_indices in rows:
 with st.expander("View Raw Data Metadata"):
     if datasets:
         # Filter by Folder
-        batch_options = get_batch_options(datasets, st.session_state.get('custom_batches', {}))
-        selected_batch_name = st.selectbox("Filter by Folder", batch_options, index=0, key="meta_batch_filter")
+        batch_map = get_batch_map(datasets, st.session_state.get('custom_batches', {}))
         
-        if selected_batch_name != "All Folders":
-            filtered_datasets = [d for d in datasets if d.get('batch_name') == selected_batch_name]
+        batch_ids = sorted(batch_map.keys())
+        options = ["ALL"] + batch_ids
+        
+        def format_batch_meta(option):
+            if option == "ALL":
+                return "All Folders"
+            return batch_map.get(option, f"Batch {option}")
+            
+        selected_batch_id = st.selectbox("Filter by Folder", options, format_func=format_batch_meta, index=0, key="meta_batch_filter")
+        
+        if selected_batch_id != "ALL":
+            filtered_datasets = [d for d in datasets if d.get('batch_id') == selected_batch_id]
         else:
             filtered_datasets = datasets
             
