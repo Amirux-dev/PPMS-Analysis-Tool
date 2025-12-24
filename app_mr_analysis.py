@@ -455,6 +455,35 @@ def delete_batch_callback(batch_id):
     if 'custom_batches' in st.session_state and batch_id in st.session_state.custom_batches:
         del st.session_state.custom_batches[batch_id]
 
+def move_files_batch_callback(file_ids, target_bid, target_name):
+    """Move multiple files to a target folder."""
+    for d in st.session_state.all_datasets:
+        if d['id'] in file_ids:
+            d['batch_id'] = target_bid
+            d['batch_name'] = target_name
+            
+    # Force refresh of selection state
+    for key in list(st.session_state.keys()):
+        if key.startswith("sel_"):
+            if isinstance(st.session_state[key], list):
+                st.session_state[key] = list(st.session_state[key])
+
+def delete_files_batch_callback(file_ids):
+    """Delete multiple files."""
+    # Identify filenames to remove from selections
+    files_to_delete = [d['fileName'] for d in st.session_state.all_datasets if d['id'] in file_ids]
+    
+    # Remove from dataset
+    st.session_state.all_datasets = [d for d in st.session_state.all_datasets if d['id'] not in file_ids]
+    
+    # Clean up selections in plots
+    for key in list(st.session_state.keys()):
+        if key.startswith("sel_"):
+            current_selection = st.session_state[key]
+            if isinstance(current_selection, list):
+                new_selection = [f for f in current_selection if f not in files_to_delete]
+                st.session_state[key] = new_selection
+
 # Create New Folder UI
 with st.sidebar.popover("➕ Create New Folder", use_container_width=True):
     st.text_input("Folder Name", "New Folder", key="new_folder_name_input")
@@ -636,6 +665,57 @@ if datasets or batches:
             st.session_state.batch_counter = 0
             st.session_state.custom_batches = {}
             st.rerun()
+
+    # --- Batch Actions ---
+    with st.sidebar.expander("⚡ Batch Actions", expanded=False):
+        # 1. Select Files
+        # Create a mapping of ID -> Display Name
+        file_options = {d['id']: f"{d['fileName']} ({d.get('batch_name', 'Unknown')})" for d in datasets}
+        
+        selected_ids = st.multiselect(
+            "Select Files",
+            options=list(file_options.keys()),
+            format_func=lambda x: file_options[x],
+            key="batch_action_files",
+            placeholder="Choose files..."
+        )
+        
+        if selected_ids:
+            st.markdown("---")
+            # Move Action
+            st.caption("Move Selected")
+            
+            # Target options (All folders)
+            target_options = {bid: info['name'] for bid, info in batches.items()}
+            # Ensure "File by file" is available
+            if 0 not in target_options:
+                 target_options[0] = "📄 File by file import"
+                 
+            c_dest, c_go = st.columns([0.7, 0.3], vertical_alignment="bottom")
+            with c_dest:
+                target_bid = st.selectbox(
+                    "Target Folder", 
+                    options=list(target_options.keys()), 
+                    format_func=lambda x: target_options[x], 
+                    key="batch_move_target",
+                    label_visibility="collapsed"
+                )
+            with c_go:
+                target_name = target_options[target_bid]
+                st.button(
+                    "Move", 
+                    key="batch_move_btn", 
+                    use_container_width=True, 
+                    on_click=move_files_batch_callback, 
+                    args=(selected_ids, target_bid, target_name)
+                )
+                
+            st.markdown("---")
+            # Delete Action
+            if st.button(f"Delete {len(selected_ids)} Files", key="batch_delete_btn", type="primary", use_container_width=True, on_click=delete_files_batch_callback, args=(selected_ids,)):
+                pass # Callback handles it
+        else:
+            st.caption("Select files to see actions.")
 
     # Display "File by file" first if it exists
     if 0 in batches:
