@@ -8,6 +8,7 @@ import csv
 import math
 import re
 import statistics
+import os
 from typing import List, Dict, Any, Optional, Tuple
 
 
@@ -314,19 +315,43 @@ st.sidebar.header("📂 Data Manager")
 # Initialize Session State for Data
 if 'all_datasets' not in st.session_state:
     st.session_state.all_datasets = []
+if 'uploader_key' not in st.session_state:
+    st.session_state.uploader_key = 0
+if 'batch_counter' not in st.session_state:
+    st.session_state.batch_counter = 0
 
-# File Uploader (Wrapped in a form to clear after upload)
-with st.sidebar.form("upload_form", clear_on_submit=True):
-    uploaded_files = st.file_uploader(
-        "Upload .dat files", 
-        type=["dat"], 
-        accept_multiple_files=True,
-        help="Drag and drop files here. Click 'Add Data' to process them."
-    )
-    submitted = st.form_submit_button("Add Data")
+# File Uploader (Automatic)
+uploaded_files = st.sidebar.file_uploader(
+    "Upload .dat files", 
+    type=["dat"], 
+    accept_multiple_files=True,
+    key=f"uploader_{st.session_state.uploader_key}",
+    help="Drag and drop files or folders here. They will be automatically processed."
+)
 
-# Process Uploaded Files
-if submitted and uploaded_files:
+# Process Uploaded Files Automatically
+if uploaded_files:
+    # Determine Batch Type
+    is_batch = len(uploaded_files) > 1
+    
+    if is_batch:
+        st.session_state.batch_counter += 1
+        batch_id = st.session_state.batch_counter
+        
+        # Attempt to guess folder name from common prefix
+        filenames = [f.name for f in uploaded_files]
+        prefix = os.path.commonprefix(filenames)
+        
+        # Clean prefix (remove trailing separators or numbers if it looks like a file sequence)
+        # e.g. "SRO_1.dat", "SRO_2.dat" -> "SRO_"
+        if prefix:
+            batch_name = f"📂 {prefix.strip('_- ')}"
+        else:
+            batch_name = f"📂 Batch Import #{batch_id}"
+    else:
+        batch_id = 0
+        batch_name = "📄 File by file import"
+    
     new_files_count = 0
     for uploaded_file in uploaded_files:
         # Check if file already loaded to avoid duplicates
@@ -336,6 +361,11 @@ if submitted and uploaded_files:
         try:
             content = uploaded_file.getvalue().decode("utf-8", errors="ignore")
             data = parse_multivu_content(content, uploaded_file.name)
+            
+            # Add Batch Info
+            data['batch_id'] = batch_id
+            data['batch_name'] = batch_name 
+            
             st.session_state.all_datasets.append(data)
             new_files_count += 1
         except Exception as e:
@@ -343,7 +373,10 @@ if submitted and uploaded_files:
     
     if new_files_count > 0:
         st.sidebar.success(f"Added {new_files_count} new files.")
-        st.rerun() # Rerun to update the list immediately
+        
+        # Increment key to clear uploader
+        st.session_state.uploader_key += 1
+        st.rerun()
 
 # Data Management & Explorer
 datasets = st.session_state.all_datasets
@@ -368,17 +401,46 @@ if datasets:
     with c_clear:
         if st.button("🗑️ Clear", help="Remove all loaded data"):
             st.session_state.all_datasets = []
+            st.session_state.batch_counter = 0
             st.rerun()
 
-    # List files in original order (No sorting, No grouping)
-    with st.sidebar.expander("📁 Loaded Files", expanded=True):
-        for d in datasets:
-            st.text(f"📄 {d['fileName']}")
+    # Group by Batch
+    # Special handling: Batch 0 (File by file) is merged
+    batches = {}
+    batch_order = []
+    
+    # First, find all batches
+    for d in datasets:
+        bid = d.get('batch_id', 0)
+        # Force name for ID 0
+        if bid == 0:
+            bname = "📄 File by file import"
+        else:
+            bname = d.get('batch_name', f"📂 Batch #{bid}")
+            
+        if bid not in batches:
+            batches[bid] = {'name': bname, 'files': []}
+            if bid not in batch_order:
+                batch_order.append(bid)
+        batches[bid]['files'].append(d)
+        
+    # Display "File by file" first if it exists
+    if 0 in batches:
+        with st.sidebar.expander(batches[0]['name'], expanded=True):
+            for d in batches[0]['files']:
+                st.text(f"📄 {d['fileName']}")
+    
+    # Display other batches
+    for bid in batch_order:
+        if bid == 0: continue
+        with st.sidebar.expander(batches[bid]['name'], expanded=True):
+            for d in batches[bid]['files']:
+                st.text(f"📄 {d['fileName']}")
     
     st.sidebar.caption("⚠️ Refreshing the page will clear the data.")
 
 else:
-    st.sidebar.info("No data loaded. Upload files to begin.")
+    st.sidebar.info("Upload files to begin.")
     st.stop()
 
 # --- Sidebar: Footer ---
