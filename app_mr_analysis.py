@@ -700,10 +700,11 @@ def create_plot_interface(plot_id: str, available_datasets: List[Dict[str, Any]]
             else:
                 filtered_datasets = available_datasets
 
-            options = [d['label'] for d in filtered_datasets]
-            default_sel = [] # Default to empty selection
-            selected_labels = st.multiselect(f"Select Curves for Plot {plot_id}", options, default=default_sel, key=f"sel_{plot_id}")
-            selected_datasets = [d for d in filtered_datasets if d['label'] in selected_labels]
+            # Use Raw Filenames for Selection (Consistent across modes)
+            options = [d['fileName'] for d in filtered_datasets]
+            default_sel = [] 
+            selected_filenames = st.multiselect(f"Select Curves for Plot {plot_id}", options, default=default_sel, key=f"sel_{plot_id}")
+            selected_datasets = [d for d in filtered_datasets if d['fileName'] in selected_filenames]
 
             if selected_datasets:
                 # Find common non-empty columns or just take from first
