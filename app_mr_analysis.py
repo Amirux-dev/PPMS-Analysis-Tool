@@ -1001,7 +1001,8 @@ if datasets or batches:
     st.sidebar.markdown("---")
     st.sidebar.markdown("""
 **Author :** Amir MEDDAS  
-*LPS - Laboratoire de Physique des Solides*<br>
+*LPS - Laboratoire de Physique des Solides*
+                        
 *C2N - Centre de Nanosciences et de Nanotechnologies*    
 [![LinkedIn](https://img.shields.io/badge/LinkedIn-0077B5?style=for-the-badge&logo=linkedin&logoColor=white)](https://www.linkedin.com/in/amir-meddas-80876424b/)
 """)
@@ -1011,7 +1012,8 @@ else:
     st.sidebar.markdown("---")
     st.sidebar.markdown("""
 **Author :** Amir MEDDAS  
-*LPS - Laboratoire de Physique des Solides*<br>
+*LPS - Laboratoire de Physique des Solides*
+                        
 *C2N - Centre de Nanosciences et de Nanotechnologies*  
 [![LinkedIn](https://img.shields.io/badge/LinkedIn-0077B5?style=for-the-badge&logo=linkedin&logoColor=white)](https://www.linkedin.com/in/amir-meddas-80876424b/)
 """)
@@ -1498,36 +1500,38 @@ def create_plot_interface(plot_id: str, available_datasets: List[Dict[str, Any]]
         export_data = {}
 
         for d in selected_datasets:
-            x_data = None
-            y_data = None
-            x_label = ""
-            y_label = ""
+            items_to_plot = [] # List of tuples: (x_data, y_data, x_label, y_label, suffix)
 
             if analysis_mode in ["Standard MR Analysis", "Standard R-H Analysis"]:
-                df = pd.DataFrame({"H_T": d["H_T"], "R": d["R"]})
+                # Base Data
+                df_base = pd.DataFrame({"H_T": d["H_T"], "R": d["R"]})
                 
-                # Symmetrization (Fold and Mirror)
+                # List of dataframes to process: (df, suffix)
+                dfs_to_process = [(df_base, "")]
+                
                 if symmetrize:
-                    # 1. Fold all data to positive field (H -> |H|)
-                    df["H_T"] = df["H_T"].abs()
+                    # Symmetrization Logic
+                    df_sym = df_base.copy()
+                    df_sym["H_T"] = df_sym["H_T"].abs()
                     
-                    # 2. Average data with same H (to remove hysteresis/oscillations)
-                    # Round H to avoid floating point issues (e.g. 1e-5 T resolution)
-                    df["H_round"] = df["H_T"].round(5) 
-                    df = df.groupby("H_round", as_index=False).mean()
-                    df = df.drop(columns=["H_round"])
+                    # Average data with same H (to remove hysteresis/oscillations)
+                    df_sym["H_round"] = df_sym["H_T"].round(5) 
+                    df_sym = df_sym.groupby("H_round", as_index=False).mean()
+                    df_sym = df_sym.drop(columns=["H_round"])
                     
-                    # 3. Create Negative Field Data (Mirror)
-                    df_neg = df.copy()
+                    # Mirror
+                    df_neg = df_sym.copy()
                     df_neg["H_T"] = -df_neg["H_T"]
                     
-                    # 4. Combine and Sort
-                    df = pd.concat([df_neg, df], ignore_index=True)
-                    df = df.sort_values(by="H_T")
+                    # Combine
+                    df_sym = pd.concat([df_neg, df_sym], ignore_index=True)
+                    df_sym = df_sym.sort_values(by="H_T")
+                    
+                    dfs_to_process.append((df_sym, " (Sym)"))
 
-                # Calculate R0 (For MR and R-H Analysis)
-                r0 = 1.0
-                if analysis_mode in ["Standard MR Analysis", "Standard R-H Analysis"]:
+                for df, suffix in dfs_to_process:
+                    # Calculate R0
+                    r0 = 1.0
                     if r0_method == "First Point":
                         r0 = df["R"].iloc[0]
                     elif r0_method == "Closest to 0T":
@@ -1543,45 +1547,34 @@ def create_plot_interface(plot_id: str, available_datasets: List[Dict[str, Any]]
                     elif r0_method == "Max Resistance":
                         r0 = df["R"].max()
 
-                # Calculate X
-                x_data = df["H_T"]
-                x_label = "Field (T)"
-                if x_axis_unit == "Oersted (Oe)":
-                    x_data = x_data * 10000
-                    x_label = "Field (Oe)"
+                    # Calculate X
+                    x_d = df["H_T"]
+                    x_l = "Field (T)"
+                    if x_axis_unit == "Oersted (Oe)":
+                        x_d = x_d * 10000
+                        x_l = "Field (Oe)"
 
-                # Calculate Y
-                if analysis_mode == "Standard MR Analysis":
+                    # Calculate Y
+                    y_d = None
+                    y_l = ""
+                    
                     if y_axis_mode == "Magnetoresistance (MR %)":
-                        y_data = 100 * (df["R"] - r0) / r0
-                        y_label = "MR (%)"
+                        y_d = 100 * (df["R"] - r0) / r0
+                        y_l = "MR (%)"
                     elif y_axis_mode == "Normalized (R/R0)":
-                        y_data = df["R"] / r0
-                        y_label = "R / R0"
-                    elif y_axis_mode == "Derivative (dR/dH)":
-                        # Simple finite difference
-                        dy = df["R"].diff()
-                        dx = df["H_T"].diff()
-                        y_data = dy / dx
-                        y_label = "dR/dH (Ω/T)"
-                        # Remove first NaN
-                        y_data = y_data.fillna(0)
-                    else: # Resistance
-                        y_data = df["R"]
-                        y_label = "Resistance (Ω)"
-                else: # Standard R-H Analysis
-                    if y_axis_mode == "Normalized (R/R0)":
-                        y_data = df["R"] / r0
-                        y_label = "R / R0"
+                        y_d = df["R"] / r0
+                        y_l = "R / R0"
                     elif y_axis_mode == "Derivative (dR/dH)":
                         dy = df["R"].diff()
                         dx = df["H_T"].diff()
-                        y_data = dy / dx
-                        y_label = "dR/dH (Ω/T)"
-                        y_data = y_data.fillna(0)
+                        y_d = dy / dx
+                        y_l = "dR/dH (Ω/T)"
+                        y_d = y_d.fillna(0)
                     else: # Resistance
-                        y_data = df["R"]
-                        y_label = "Resistance (Ω)"
+                        y_d = df["R"]
+                        y_l = "Resistance (Ω)"
+                    
+                    items_to_plot.append((x_d, y_d, x_l, y_l, suffix))
             
             elif analysis_mode == "Standard R-T Analysis":
                 if 'full_df' not in d:
@@ -1611,6 +1604,9 @@ def create_plot_interface(plot_id: str, available_datasets: List[Dict[str, Any]]
                 x_data = df["T"]
                 x_label = "Temperature (K)"
                 
+                y_data = None
+                y_label = ""
+
                 if y_axis_mode == "Resistance (Ω)":
                     y_data = df["R"]
                     y_label = "Resistance (Ω)"
@@ -1626,6 +1622,8 @@ def create_plot_interface(plot_id: str, available_datasets: List[Dict[str, Any]]
                     y_data = dy / dx
                     y_label = "dR/dT (Ω/K)"
                     y_data = y_data.fillna(0)
+                
+                items_to_plot.append((x_data, y_data, x_label, y_label, ""))
 
             else:
                 # Custom Columns Mode
@@ -1685,133 +1683,141 @@ def create_plot_interface(plot_id: str, available_datasets: List[Dict[str, Any]]
                     mask_d = y_data.notna()
                     x_data = x_data[mask_d]
                     y_data = y_data[mask_d]
+                
+                items_to_plot.append((x_data, y_data, x_label, y_label, ""))
 
-            # Smoothing
-            if smooth_window > 1:
-                y_data = y_data.rolling(window=int(smooth_window), center=True).mean()
+            # --- PLOTTING LOOP ---
+            for x_data, y_data, x_label, y_label, suffix in items_to_plot:
+                if x_data is None or y_data is None:
+                    continue
 
-            # Plot Trace
-            mode_map = {"Lines": "lines", "Markers": "markers", "Lines+Markers": "lines+markers"}
-            
-            # Legend Name
-            legend_name = custom_legends.get(d['id'], d['fileName'])
-            
-            fig.add_trace(go.Scatter(
-                x=x_data,
-                y=y_data,
-                mode=mode_map[plot_mode],
-                name=legend_name,
-                hovertemplate=f"{x_label}: %{{x:.4f}}<br>{y_label}: %{{y:.4e}}<extra></extra>",
-                line=dict(width=line_width) if "Lines" in plot_mode else None,
-                marker=dict(size=marker_size) if "Markers" in plot_mode else None
-            ))
-            
-            # Linear Fit
-            if show_linear_fit and x_data is not None and y_data is not None:
-                # Remove NaNs for fitting
-                mask_fit = x_data.notna() & y_data.notna()
-                
-                # Apply Range Filter
-                if fit_range_min is not None:
-                    mask_fit &= (x_data >= fit_range_min)
-                if fit_range_max is not None:
-                    mask_fit &= (x_data <= fit_range_max)
-                
-                xf = x_data[mask_fit]
-                yf = y_data[mask_fit]
-                
-                if len(xf) > 1:
-                    # Polyfit degree 1
-                    slope, intercept = np.polyfit(xf, yf, 1)
-                    y_fit = slope * xf + intercept
-                    
-                    # Plot the fit line only within the range
-                    fig.add_trace(go.Scatter(
-                        x=xf,
-                        y=y_fit,
-                        mode='lines',
-                        name=f"Fit {legend_name}",
-                        line=dict(dash='dash', width=2, color='red'),
-                        hoverinfo='skip'
-                    ))
-                    
-                    # Enhanced Annotation
-                    eq_text = f"<b>y = {slope:.3e} x + {intercept:.3e}</b>"
-                    
-                    # Position annotation near the center of the fit segment
-                    mid_idx = len(xf) // 2
-                    
-                    fig.add_annotation(
-                        x=xf.iloc[mid_idx],
-                        y=y_fit.iloc[mid_idx],
-                        text=eq_text,
-                        showarrow=True,
-                        arrowhead=2,
-                        arrowsize=1,
-                        arrowwidth=2,
-                        ax=0,
-                        ay=-40,
-                        bgcolor="rgba(255, 255, 255, 0.8)",
-                        bordercolor="black",
-                        borderwidth=1,
-                        font=dict(size=14, color="black")
-                    )
+                # Smoothing
+                if smooth_window > 1:
+                    y_data = y_data.rolling(window=int(smooth_window), center=True).mean()
 
-            # Parabolic Fit
-            if show_parabolic_fit and x_data is not None and y_data is not None:
-                # Remove NaNs for fitting
-                mask_pfit = x_data.notna() & y_data.notna()
+                # Plot Trace
+                mode_map = {"Lines": "lines", "Markers": "markers", "Lines+Markers": "lines+markers"}
                 
-                # Apply Range Filter
-                if pfit_range_min is not None:
-                    mask_pfit &= (x_data >= pfit_range_min)
-                if pfit_range_max is not None:
-                    mask_pfit &= (x_data <= pfit_range_max)
+                # Legend Name
+                base_legend = custom_legends.get(d['id'], d['fileName'])
+                legend_name = f"{base_legend}{suffix}"
                 
-                xpf = x_data[mask_pfit]
-                ypf = y_data[mask_pfit]
+                fig.add_trace(go.Scatter(
+                    x=x_data,
+                    y=y_data,
+                    mode=mode_map[plot_mode],
+                    name=legend_name,
+                    hovertemplate=f"{x_label}: %{{x:.4f}}<br>{y_label}: %{{y:.4e}}<extra></extra>",
+                    line=dict(width=line_width, dash='dash' if suffix else None) if "Lines" in plot_mode else None,
+                    marker=dict(size=marker_size) if "Markers" in plot_mode else None
+                ))
                 
-                if len(xpf) > 2: # Need at least 3 points for parabola
-                    # Polyfit degree 2
-                    a, b, c = np.polyfit(xpf, ypf, 2)
-                    y_pfit = a * xpf**2 + b * xpf + c
+                # Linear Fit
+                if show_linear_fit and x_data is not None and y_data is not None:
+                    # Remove NaNs for fitting
+                    mask_fit = x_data.notna() & y_data.notna()
                     
-                    # Plot the fit line only within the range
-                    fig.add_trace(go.Scatter(
-                        x=xpf,
-                        y=y_pfit,
-                        mode='lines',
-                        name=f"ParaFit {legend_name}",
-                        line=dict(dash='dot', width=3, color='green'),
-                        hoverinfo='skip'
-                    ))
+                    # Apply Range Filter
+                    if fit_range_min is not None:
+                        mask_fit &= (x_data >= fit_range_min)
+                    if fit_range_max is not None:
+                        mask_fit &= (x_data <= fit_range_max)
                     
-                    # Enhanced Annotation
-                    eq_text = f"<b>y = {a:.2e} x² + {b:.2e} x + {c:.2e}</b>"
+                    xf = x_data[mask_fit]
+                    yf = y_data[mask_fit]
                     
-                    # Position annotation near the center of the fit segment
-                    mid_idx = len(xpf) // 2
-                    
-                    fig.add_annotation(
-                        x=xpf.iloc[mid_idx],
-                        y=y_pfit.iloc[mid_idx],
-                        text=eq_text,
-                        showarrow=True,
-                        arrowhead=2,
-                        arrowsize=1,
-                        arrowwidth=2,
-                        ax=0,
-                        ay=40, # Offset downwards
-                        bgcolor="rgba(255, 255, 255, 0.8)",
-                        bordercolor="blue",
-                        borderwidth=1,
-                        font=dict(size=14, color="blue")
-                    )
+                    if len(xf) > 1:
+                        # Polyfit degree 1
+                        slope, intercept = np.polyfit(xf, yf, 1)
+                        y_fit = slope * xf + intercept
+                        
+                        # Plot the fit line only within the range
+                        fig.add_trace(go.Scatter(
+                            x=xf,
+                            y=y_fit,
+                            mode='lines',
+                            name=f"Fit {legend_name}",
+                            line=dict(dash='dash', width=2, color='red'),
+                            hoverinfo='skip'
+                        ))
+                        
+                        # Enhanced Annotation
+                        eq_text = f"<b>y = {slope:.3e} x + {intercept:.3e}</b>"
+                        
+                        # Position annotation near the center of the fit segment
+                        mid_idx = len(xf) // 2
+                        
+                        fig.add_annotation(
+                            x=xf.iloc[mid_idx],
+                            y=y_fit.iloc[mid_idx],
+                            text=eq_text,
+                            showarrow=True,
+                            arrowhead=2,
+                            arrowsize=1,
+                            arrowwidth=2,
+                            ax=0,
+                            ay=-40,
+                            bgcolor="rgba(255, 255, 255, 0.8)",
+                            bordercolor="black",
+                            borderwidth=1,
+                            font=dict(size=14, color="black")
+                        )
 
-            # Add to export
-            clean_label = d['label'].replace(" ", "_")
-            export_data[f"{clean_label}_X"] = x_data.values
-            export_data[f"{clean_label}_Y"] = y_data.values
+                # Parabolic Fit
+                if show_parabolic_fit and x_data is not None and y_data is not None:
+                    # Remove NaNs for fitting
+                    mask_pfit = x_data.notna() & y_data.notna()
+                    
+                    # Apply Range Filter
+                    if pfit_range_min is not None:
+                        mask_pfit &= (x_data >= pfit_range_min)
+                    if pfit_range_max is not None:
+                        mask_pfit &= (x_data <= pfit_range_max)
+                    
+                    xpf = x_data[mask_pfit]
+                    ypf = y_data[mask_pfit]
+                    
+                    if len(xpf) > 2: # Need at least 3 points for parabola
+                        # Polyfit degree 2
+                        a, b, c = np.polyfit(xpf, ypf, 2)
+                        y_pfit = a * xpf**2 + b * xpf + c
+                        
+                        # Plot the fit line only within the range
+                        fig.add_trace(go.Scatter(
+                            x=xpf,
+                            y=y_pfit,
+                            mode='lines',
+                            name=f"ParaFit {legend_name}",
+                            line=dict(dash='dot', width=3, color='green'),
+                            hoverinfo='skip'
+                        ))
+                        
+                        # Enhanced Annotation
+                        eq_text = f"<b>y = {a:.2e} x² + {b:.2e} x + {c:.2e}</b>"
+                        
+                        # Position annotation near the center of the fit segment
+                        mid_idx = len(xpf) // 2
+                        
+                        fig.add_annotation(
+                            x=xpf.iloc[mid_idx],
+                            y=y_pfit.iloc[mid_idx],
+                            text=eq_text,
+                            showarrow=True,
+                            arrowhead=2,
+                            arrowsize=1,
+                            arrowwidth=2,
+                            ax=0,
+                            ay=40, # Offset downwards
+                            bgcolor="rgba(255, 255, 255, 0.8)",
+                            bordercolor="blue",
+                            borderwidth=1,
+                            font=dict(size=14, color="blue")
+                        )
+
+                # Add to export
+                clean_label = d['label'].replace(" ", "_") + suffix.replace(" ", "_").replace("(", "").replace(")", "")
+                export_data[f"{clean_label}_X"] = x_data.values
+                export_data[f"{clean_label}_Y"] = y_data.values
 
         # Apply Customization
         final_title = custom_title if custom_title else f"{y_label} vs {x_label}"
