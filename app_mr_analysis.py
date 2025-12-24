@@ -816,9 +816,20 @@ if dialog_decorator:
     def manage_batch_dialog(datasets: List[Dict[str, Any]], batches: Dict[int, Dict[str, Any]]):
         st.write("Select multiple files to move or delete them at once.")
         
+        # Filter by Folder
+        filter_options = {-1: "All Files"}
+        filter_options.update({bid: info['name'] for bid, info in batches.items()})
+        
+        selected_filter = st.selectbox("Filter by Folder", options=list(filter_options.keys()), format_func=lambda x: filter_options[x], key="dlg_batch_filter")
+        
+        if selected_filter != -1:
+            filtered_datasets = [d for d in datasets if d.get('batch_id', 0) == selected_filter]
+        else:
+            filtered_datasets = datasets
+        
         # 1. Select Files
         # Create a mapping of ID -> Display Name
-        file_options = {d['id']: f"{d['fileName']} ({d.get('batch_name', 'Unknown')})" for d in datasets}
+        file_options = {d['id']: f"{d['fileName']} ({d.get('batch_name', 'Unknown')})" for d in filtered_datasets}
         
         selected_ids = st.multiselect(
             "Select Files",
@@ -978,8 +989,19 @@ if datasets or batches:
     else:
         # Fallback for older versions
         with st.sidebar.expander("⚡ Batch Actions", expanded=False):
+            # Filter by Folder
+            filter_options = {-1: "All Files"}
+            filter_options.update({bid: info['name'] for bid, info in batches.items()})
+            
+            selected_filter = st.selectbox("Filter by Folder", options=list(filter_options.keys()), format_func=lambda x: filter_options[x], key="sb_batch_filter")
+            
+            if selected_filter != -1:
+                filtered_datasets = [d for d in datasets if d.get('batch_id', 0) == selected_filter]
+            else:
+                filtered_datasets = datasets
+
             # 1. Select Files
-            file_options = {d['id']: f"{d['fileName']} ({d.get('batch_name', 'Unknown')})" for d in datasets}
+            file_options = {d['id']: f"{d['fileName']} ({d.get('batch_name', 'Unknown')})" for d in filtered_datasets}
             
             selected_ids = st.multiselect(
                 "Select Files",
