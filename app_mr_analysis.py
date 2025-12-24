@@ -306,19 +306,23 @@ def parse_multivu_content(content: str, filename: str) -> Dict[str, Any]:
 
 st.set_page_config(page_title="PPMS Analysis Tool", layout="wide")
 
-st.title("📊 PPMS Analysis Tool")
-st.markdown("Upload `.dat` files to analyze MR, Resistance, and Normalization.")
-
-# --- Sidebar: Data Manager ---
-st.sidebar.header("📂 Data Manager")
-
-# Initialize Session State for Data
+# --- State Initialization (Moved to Top) ---
 if 'all_datasets' not in st.session_state:
     st.session_state.all_datasets = []
 if 'uploader_key' not in st.session_state:
     st.session_state.uploader_key = 0
 if 'batch_counter' not in st.session_state:
     st.session_state.batch_counter = 0
+if 'plot_ids' not in st.session_state:
+    st.session_state.plot_ids = [1]
+if 'next_plot_id' not in st.session_state:
+    st.session_state.next_plot_id = 2
+
+st.title("📊 PPMS Analysis Tool")
+st.markdown("Upload `.dat` files to visualize and analyze transport measurements (R-T, MR, I-V, etc.).")
+
+# --- Sidebar: Data Manager ---
+st.sidebar.header("📂 Data Manager")
 
 # File Uploader (Automatic)
 uploaded_files = st.sidebar.file_uploader(
@@ -383,9 +387,6 @@ if uploaded_files:
         st.session_state.uploader_key += 1
         st.rerun()
 
-# Data Management & Explorer
-datasets = st.session_state.all_datasets
-
 # Folder Management Actions
 # (Always active now, no checkbox)
 organize_mode = True
@@ -401,7 +402,35 @@ with st.sidebar.popover("➕ Create New Folder", use_container_width=True):
         st.success(f"Created {new_folder_name}")
         st.rerun()
 
-if datasets:
+# Data Management & Explorer
+datasets = st.session_state.all_datasets
+
+# Group by Batch (Logic moved up to handle empty state)
+batches = {}
+batch_order = []
+
+# 1. Collect existing batches from files
+for d in datasets:
+    bid = d.get('batch_id', 0)
+    if bid == 0:
+        bname = "📄 File by file import"
+    else:
+        bname = d.get('batch_name', f"📂 Batch #{bid}")
+        
+    if bid not in batches:
+        batches[bid] = {'name': bname, 'files': []}
+        if bid not in batch_order:
+            batch_order.append(bid)
+    batches[bid]['files'].append(d)
+
+# 2. Add empty custom batches
+if 'custom_batches' in st.session_state:
+    for bid, bname in st.session_state.custom_batches.items():
+        if bid not in batches:
+            batches[bid] = {'name': bname, 'files': []}
+            batch_order.append(bid)
+
+if datasets or batches:
     # Ensure unique labels (but preserve order)
     label_counts = {}
     for d in datasets:
@@ -426,31 +455,6 @@ if datasets:
             st.session_state.batch_counter = 0
             if 'custom_batches' in st.session_state: del st.session_state.custom_batches
             st.rerun()
-
-    # Group by Batch
-    batches = {}
-    batch_order = []
-    
-    # 1. Collect existing batches from files
-    for d in datasets:
-        bid = d.get('batch_id', 0)
-        if bid == 0:
-            bname = "📄 File by file import"
-        else:
-            bname = d.get('batch_name', f"📂 Batch #{bid}")
-            
-        if bid not in batches:
-            batches[bid] = {'name': bname, 'files': []}
-            if bid not in batch_order:
-                batch_order.append(bid)
-        batches[bid]['files'].append(d)
-    
-    # 2. Add empty custom batches
-    if 'custom_batches' in st.session_state:
-        for bid, bname in st.session_state.custom_batches.items():
-            if bid not in batches:
-                batches[bid] = {'name': bname, 'files': []}
-                batch_order.append(bid)
 
     # Display "File by file" first if it exists
     if 0 in batches:
@@ -482,9 +486,17 @@ if datasets:
         b_name = batches[bid]['name']
         with st.sidebar.expander(b_name, expanded=True):
             # Rename Feature
-            col_ren, col_help = st.columns([4, 1])
+            col_ren, col_del = st.columns([0.85, 0.15])
             with col_ren:
                 new_name = st.text_input("Folder Name", value=b_name, key=f"rename_{bid}", label_visibility="collapsed")
+            with col_del:
+                if st.button("🗑️", key=f"del_batch_{bid}", help="Delete Folder"):
+                    # Remove files in this batch
+                    st.session_state.all_datasets = [d for d in st.session_state.all_datasets if d.get('batch_id') != bid]
+                    # Remove custom batch entry
+                    if 'custom_batches' in st.session_state and bid in st.session_state.custom_batches:
+                        del st.session_state.custom_batches[bid]
+                    st.rerun()
             
             if new_name != b_name:
                 # Update all files in this batch
