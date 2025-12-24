@@ -1009,8 +1009,8 @@ def create_plot_interface(plot_id: str, available_datasets: List[Dict[str, Any]]
     
     with st.container(border=True):
         # Header with Actions - Flattened Layout for Robustness
-        # Using a balanced ratio (3:1) ensures buttons have enough width even in narrow columns.
-        c_title, c_ren, c_add, c_rem, c_dup = st.columns([3, 1, 1, 1, 1], vertical_alignment="center", gap="small")
+        # Adjusted ratio (2:1) to give buttons more relative width in narrow containers (3 cols + sidebar).
+        c_title, c_ren, c_add, c_rem, c_dup = st.columns([2, 1, 1, 1, 1], vertical_alignment="center", gap="small")
         
         with c_title:
             # Plot Name or Edit Input
