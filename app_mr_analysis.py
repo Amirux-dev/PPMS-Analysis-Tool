@@ -314,40 +314,51 @@ def persistent_selectbox(label, options, persistent_key, **kwargs):
     even when the widget key changes (e.g. due to uploader_key rotation).
     """
     uploader_key = st.session_state.get('uploader_key', 0)
-    
-    # Initialize if missing
-    if persistent_key not in st.session_state:
-        default_idx = kwargs.get('index', 0)
-        if 0 <= default_idx < len(options):
-            st.session_state[persistent_key] = options[default_idx]
-        elif options:
-            st.session_state[persistent_key] = options[0]
-            
-    # Dynamic Key
     widget_key = f"{persistent_key}_{uploader_key}"
     
-    # Sync Widget -> State (if widget was interacted with or just rendered)
+    # 1. Determine the value to show
+    # Priority: 
+    # a) Current widget value (if it exists in session state - i.e. user just changed it)
+    # b) Persistent value (from previous runs/keys)
+    # c) Default index
+    
+    index_to_use = kwargs.get('index', 0)
+    
     if widget_key in st.session_state:
-        st.session_state[persistent_key] = st.session_state[widget_key]
-        
-    # Get current value
-    current_val = st.session_state.get(persistent_key)
-    
-    # Find index
+        # User interacted with THIS widget version
+        current_val = st.session_state[widget_key]
+        # Update persistent store
+        st.session_state[persistent_key] = current_val
+    elif persistent_key in st.session_state:
+        # New widget version (e.g. after upload), load from persistent store
+        current_val = st.session_state[persistent_key]
+    else:
+        # First time ever
+        if 0 <= index_to_use < len(options):
+            current_val = options[index_to_use]
+        elif options:
+            current_val = options[0]
+        else:
+            current_val = None
+            
+    # Calculate index for Streamlit
     try:
-        idx = options.index(current_val)
-    except (ValueError, IndexError):
-        # Value not in options (e.g. column missing in new file)
-        idx = kwargs.get('index', 0)
-        # Update state to valid value
-        if 0 <= idx < len(options):
-             st.session_state[persistent_key] = options[idx]
-    
-    # Remove index/key from kwargs to avoid conflict
+        if current_val in options:
+            index_to_use = options.index(current_val)
+    except:
+        pass
+        
+    # Remove conflicting kwargs
     kwargs.pop('index', None)
     kwargs.pop('key', None)
     
-    return st.selectbox(label, options, index=idx, key=widget_key, **kwargs)
+    # Render widget
+    selected_val = st.selectbox(label, options, index=index_to_use, key=widget_key, **kwargs)
+    
+    # Ensure persistent state is synced (crucial for the very first run or after reset)
+    st.session_state[persistent_key] = selected_val
+    
+    return selected_val
 
 def init_session_state():
     """Initialize all session state variables."""
@@ -967,19 +978,6 @@ def create_plot_interface(plot_id: str, available_datasets: List[Dict[str, Any]]
             persistent_key=f"mode_{plot_id}"
         )
         
-        # --- Unified File Selection ---
-        # Filter by Folder (Batch)
-        batch_map = get_batch_map(available_datasets, st.session_state.get('custom_batches', {}))
-        
-        # Options: "ALL" + sorted IDs
-        batch_ids = sorted(batch_map.keys())
-        options = ["ALL"] + batch_ids
-        
-        def format_batch(option):
-            if option == "ALL":
-                return "All Folders"
-            return batch_map.get(option, f"Batch {option}")
-
         # --- Unified File Selection ---
         # Filter by Folder (Batch)
         batch_map = get_batch_map(available_datasets, st.session_state.get('custom_batches', {}))
