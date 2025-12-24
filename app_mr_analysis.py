@@ -306,17 +306,23 @@ def parse_multivu_content(content: str, filename: str) -> Dict[str, Any]:
 
 st.set_page_config(page_title="PPMS Analysis Tool", layout="wide")
 
-# --- State Initialization (Moved to Top) ---
-if 'all_datasets' not in st.session_state:
-    st.session_state.all_datasets = []
-if 'uploader_key' not in st.session_state:
-    st.session_state.uploader_key = 0
-if 'batch_counter' not in st.session_state:
-    st.session_state.batch_counter = 0
-if 'plot_ids' not in st.session_state:
-    st.session_state.plot_ids = [1]
-if 'next_plot_id' not in st.session_state:
-    st.session_state.next_plot_id = 2
+# --- State Initialization ---
+def init_session_state():
+    """Initialize all session state variables."""
+    defaults = {
+        'all_datasets': [],
+        'uploader_key': 0,
+        'batch_counter': 0,
+        'plot_ids': [1],
+        'next_plot_id': 2,
+        'custom_batches': {}
+    }
+    
+    for key, value in defaults.items():
+        if key not in st.session_state:
+            st.session_state[key] = value
+
+init_session_state()
 
 st.title("PPMS Analysis Tool")
 st.markdown("Upload `.dat` files to visualize and analyze transport measurements (R-T, MR, I-V, etc.).")
@@ -332,11 +338,6 @@ uploaded_files = st.sidebar.file_uploader(
     key=f"uploader_{st.session_state.uploader_key}",
     help="Drag and drop files or folders here. They will be automatically processed."
 )
-
-# --- Sidebar: Footer (Moved to bottom) ---
-# st.sidebar.markdown("---")
-# ...
-
 
 # Process Uploaded Files Automatically
 if uploaded_files:
@@ -396,8 +397,6 @@ with st.sidebar.popover("➕ Create New Folder", use_container_width=True):
     new_folder_name = st.text_input("Folder Name", "New Folder")
     if st.button("Create", use_container_width=True):
         st.session_state.batch_counter += 1
-        if 'custom_batches' not in st.session_state:
-            st.session_state.custom_batches = {}
         st.session_state.custom_batches[st.session_state.batch_counter] = f"📂 {new_folder_name}"
         st.success(f"Created {new_folder_name}")
         st.rerun()
@@ -414,9 +413,78 @@ def delete_file_callback(file_id):
     st.session_state.all_datasets = [d for d in st.session_state.all_datasets if d['id'] != file_id]
 
 def delete_batch_callback(batch_id):
+    # Delete files in the batch
     st.session_state.all_datasets = [d for d in st.session_state.all_datasets if d.get('batch_id') != batch_id]
+    # Delete the batch entry
     if 'custom_batches' in st.session_state and batch_id in st.session_state.custom_batches:
         del st.session_state.custom_batches[batch_id]
+
+def rename_batch_callback(batch_id, old_name):
+    # Get new name from session state widget
+    new_name = st.session_state.get(f"rename_{batch_id}")
+    
+    # Basic validation
+    if not new_name or new_name == old_name:
+        return
+
+    # Update files
+    for d in st.session_state.all_datasets:
+        if d.get('batch_id') == batch_id:
+            d['batch_name'] = new_name
+    
+    # Update custom batches
+    if 'custom_batches' in st.session_state and batch_id in st.session_state.custom_batches:
+        st.session_state.custom_batches[batch_id] = new_name
+        
+    # Update Plot Filters (Preserve selection if filtering by this folder)
+    for key in list(st.session_state.keys()):
+        if key.startswith("batch_filter_") or key.startswith("batch_filter_cust_"):
+            if st.session_state[key] == old_name:
+                st.session_state[key] = new_name
+
+def render_file_actions(file_data: Dict[str, Any], current_batch_id: int, all_batches_info: Dict[int, Dict[str, Any]]):
+    """Helper to render the Move/Delete actions for a file."""
+    with st.popover("⋮", help="Manage File"):
+        st.markdown("**Move File**")
+        
+        # Filter options: exclude current batch
+        target_options = {bid: info['name'] for bid, info in all_batches_info.items() if bid != current_batch_id}
+        
+        # Ensure "File by file" (0) is available if we are in a batch
+        if current_batch_id != 0:
+             target_options[0] = "📄 File by file import"
+        
+        if target_options:
+            c_dest, c_go = st.columns([0.7, 0.3], vertical_alignment="bottom")
+            with c_dest:
+                target_bid = st.selectbox(
+                    "Target", 
+                    options=list(target_options.keys()), 
+                    format_func=lambda x: target_options[x], 
+                    key=f"mv_sel_{file_data['id']}", 
+                    label_visibility="collapsed"
+                )
+            with c_go:
+                target_name = target_options[target_bid]
+                st.button(
+                    "Move", 
+                    key=f"mv_btn_{file_data['id']}", 
+                    use_container_width=True, 
+                    on_click=move_file_callback, 
+                    args=(file_data['id'], target_bid, target_name)
+                )
+        else:
+            st.info("No other folders.")
+
+        st.markdown("<hr style='margin: 5px 0; border: none; border-top: 1px solid #f0f0f0;'>", unsafe_allow_html=True)
+        st.button(
+            "Delete File", 
+            key=f"rm_{file_data['id']}", 
+            type="primary", 
+            use_container_width=True, 
+            on_click=delete_file_callback, 
+            args=(file_data['id'],)
+        )
 
 # Data Management & Explorer
 datasets = st.session_state.all_datasets
@@ -469,7 +537,7 @@ if datasets or batches:
         if st.button("🗑️ Clear All", help="Remove all loaded data", use_container_width=True):
             st.session_state.all_datasets = []
             st.session_state.batch_counter = 0
-            if 'custom_batches' in st.session_state: del st.session_state.custom_batches
+            st.session_state.custom_batches = {}
             st.rerun()
 
     # Display "File by file" first if it exists
@@ -480,20 +548,7 @@ if datasets or batches:
                 with c_name:
                     st.text(f"📄 {d['fileName']}")
                 with c_act:
-                    with st.popover("⋮", help="Manage File"):
-                        st.markdown("**Move File**")
-                        # Move Action
-                        all_batch_options = {bid: info['name'] for bid, info in batches.items() if bid != 0}
-                        if all_batch_options:
-                            # Compact row for move
-                            c_dest, c_go = st.columns([0.7, 0.3], vertical_alignment="bottom")
-                            with c_dest:
-                                target_bid = st.selectbox("Target", options=list(all_batch_options.keys()), format_func=lambda x: all_batch_options[x], key=f"mv_sel_{d['id']}", label_visibility="collapsed")
-                            with c_go:
-                                st.button("Move", key=f"mv_btn_{d['id']}", use_container_width=True, on_click=move_file_callback, args=(d['id'], target_bid, all_batch_options[target_bid]))
-                        
-                        st.markdown("<hr style='margin: 5px 0; border: none; border-top: 1px solid #f0f0f0;'>", unsafe_allow_html=True)
-                        st.button("Delete File", key=f"rm_{d['id']}", type="primary", use_container_width=True, on_click=delete_file_callback, args=(d['id'],))
+                    render_file_actions(d, 0, batches)
     
     # Display other batches
     for bid in batch_order:
@@ -504,46 +559,16 @@ if datasets or batches:
             # Rename Feature
             col_ren, col_del = st.columns([0.85, 0.15])
             with col_ren:
-                new_name = st.text_input("Folder Name", value=b_name, key=f"rename_{bid}", label_visibility="collapsed")
+                st.text_input("Folder Name", value=b_name, key=f"rename_{bid}", label_visibility="collapsed", on_change=rename_batch_callback, args=(bid, b_name))
             with col_del:
                 st.button("🗑️", key=f"del_batch_{bid}", help="Delete Folder", on_click=delete_batch_callback, args=(bid,))
             
-            if new_name != b_name:
-                # Update all files in this batch
-                for d in st.session_state.all_datasets:
-                    if d.get('batch_id') == bid:
-                        d['batch_name'] = new_name
-                # Update custom batch name if exists
-                if 'custom_batches' in st.session_state and bid in st.session_state.custom_batches:
-                    st.session_state.custom_batches[bid] = new_name
-                st.rerun()
-                
             for d in batches[bid]['files']:
                 c_name, c_act = st.columns([0.85, 0.15])
                 with c_name:
                     st.text(f"📄 {d['fileName']}")
                 with c_act:
-                    with st.popover("⋮", help="Manage File"):
-                        st.markdown("**Move File**")
-                        # Move Action
-                        all_batch_options = {b: info['name'] for b, info in batches.items() if b != bid}
-                        # Add File by File as option
-                        all_batch_options[0] = "📄 File by file import"
-                        
-                        if all_batch_options:
-                            # Compact row for move
-                            c_dest, c_go = st.columns([0.7, 0.3], vertical_alignment="bottom")
-                            with c_dest:
-                                target_bid = st.selectbox("Target", options=list(all_batch_options.keys()), format_func=lambda x: all_batch_options[x], key=f"mv_sel_{d['id']}", label_visibility="collapsed")
-                            with c_go:
-                                if target_bid == 0:
-                                    t_name = "📄 File by file import"
-                                else:
-                                    t_name = batches[target_bid]['name']
-                                st.button("Move", key=f"mv_btn_{d['id']}", use_container_width=True, on_click=move_file_callback, args=(d['id'], target_bid, t_name))
-                        
-                        st.markdown("<hr style='margin: 5px 0; border: none; border-top: 1px solid #f0f0f0;'>", unsafe_allow_html=True)
-                        st.button("Delete File", key=f"rm_{d['id']}", type="primary", use_container_width=True, on_click=delete_file_callback, args=(d['id'],))
+                    render_file_actions(d, bid, batches)
     
     st.sidebar.caption("⚠️ Refreshing the page will clear the data.")
     
@@ -1179,10 +1204,7 @@ with st.expander("Layout & Export Settings", expanded=True):
         plot_height = st.number_input("Plot Height (px)", min_value=300, value=600)
 
 # Dynamic Plot Management
-if 'plot_ids' not in st.session_state:
-    st.session_state.plot_ids = [1]
-if 'next_plot_id' not in st.session_state:
-    st.session_state.next_plot_id = 2
+# (State initialized at top)
 
 # Render Plots in Grid
 generated_figures = []
