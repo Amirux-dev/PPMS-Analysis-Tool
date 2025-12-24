@@ -1,0 +1,32 @@
+[Header]
+TITLE, default name
+FILEOPENTIME,14261294.39,11/16/2025,10:19 AM
+BYAPP, Resistivity, 2.1, 1.0
+INFO, APPNAME, PPMS MultiVu Application, 1.5.11
+INFO, , Sample1 Name
+INFO, 1, Sample1 Cross Section
+INFO, 1, Sample1 Length
+INFO, Ohm-m, Sample1 Units
+INFO, , Sample2 Name
+INFO, 1, Sample2 Cross Section
+INFO, 1, Sample2 Length
+INFO, Ohm-m, Sample2 Units
+INFO, , Sample3 Name
+INFO, 1, Sample3 Cross Section
+INFO, 1, Sample3 Length
+INFO, Ohm-m, Sample3 Units
+INFO, , Sample4 Name
+INFO, 1, Sample4 Cross Section
+INFO, 1, Sample4 Length
+INFO, Ohm-m, Sample4 Units
+FIELDGROUP, Resistivity,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40,41
+STARTUPGROUP, Resistivity
+STARTUPAXIS, X, 2, LINEAR, AUTO
+STARTUPAXIS, Y1, 7, LINEAR, AUTO
+STARTUPAXIS, Y2, 9, LINEAR, AUTO
+STARTUPAXIS, Y3, 11, LINEAR, AUTO
+PLOT_APPEARANCE, ALL, HORZ_GRID_ON, VERT_GRID_ON, MARKERS_AND_LINES, ALL_LINES
+DATATYPE, TIME, 2
+DATATYPE, COMMENT, 1
+[Data]
+Comment,Time Stamp (sec),Status (code),Temperature (K),Magnetic Field (Oe),Sample Position (deg),Bridge 1 Resistivity (Ohm-m),Bridge 1 Excitation (uA),Bridge 2 Resistivity (Ohm-m),Bridge 2 Excitation (uA),Bridge 3 Resistivity (Ohm-m),Bridge 3 Excitation (uA),Bridge 4 Resistivity (Ohm-m),Bridge 4 Excitation (uA),Bridge 1 Std. Dev. (Ohm-m),Bridge 2 Std. Dev. (Ohm-m),Bridge 3 Std. Dev. (Ohm-m),Bridge 4 Std. Dev. (Ohm-m),Number of Readings,Bridge 1 Resistance (Ohms),Bridge 2 Resistance (Ohms),Bridge 3 Resistance (Ohms),Bridge 4 Resistance (Ohms),Signal 1 Vin (V),Signal 2 Vin (V),Digital Inputs (code),Drive 1 Iout (mA),Drive 1 Ipower (watts),Drive 2 Iout (mA),Drive 2 Ipower (watts),Pressure (),Map 20 (),Map 21 (),Map 22 (),Map 23 (),Map 24 (),Map 25 (),Map 26 (),Map 27 (),Map 28 (),Map 29 ()
