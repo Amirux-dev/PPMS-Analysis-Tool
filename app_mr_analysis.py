@@ -391,6 +391,27 @@ if uploaded_files:
 # Data Management & Explorer
 datasets = st.session_state.all_datasets
 
+# Folder Management Actions
+if st.sidebar.checkbox("🛠️ Organize Files", help="Enable moving files between folders"):
+    organize_mode = True
+    # Create New Folder
+    with st.sidebar.popover("➕ Create New Folder"):
+        new_folder_name = st.text_input("Folder Name", "New Folder")
+        if st.button("Create"):
+            st.session_state.batch_counter += 1
+            # Create a dummy entry or just reserve the ID? 
+            # Since our structure depends on files having a batch_id, we can't easily have empty folders without a separate data structure.
+            # Workaround: We will just use the ID for the move target.
+            # But to show it in the list, we need at least one file or a separate list of batches.
+            # Let's add a 'custom_batches' to session state.
+            if 'custom_batches' not in st.session_state:
+                st.session_state.custom_batches = {}
+            st.session_state.custom_batches[st.session_state.batch_counter] = f"📂 {new_folder_name}"
+            st.success(f"Created {new_folder_name}")
+            st.rerun()
+else:
+    organize_mode = False
+
 if datasets:
     # Ensure unique labels (but preserve order)
     label_counts = {}
@@ -407,22 +428,23 @@ if datasets:
     st.sidebar.markdown("### Loaded Data")
     
     # Clear All Button (Left Aligned)
-    if st.sidebar.button("🗑️ Clear All Data", help="Remove all loaded data"):
-        st.session_state.all_datasets = []
-        st.session_state.batch_counter = 0
-        st.rerun()
-        
-    st.sidebar.write(f"**Total Files:** {len(datasets)}")
+    c_info, c_clear = st.sidebar.columns([1, 1])
+    with c_info:
+        st.write(f"**Total Files:** {len(datasets)}")
+    with c_clear:
+        if st.button("🗑️ Clear All", help="Remove all loaded data"):
+            st.session_state.all_datasets = []
+            st.session_state.batch_counter = 0
+            if 'custom_batches' in st.session_state: del st.session_state.custom_batches
+            st.rerun()
 
     # Group by Batch
-    # Special handling: Batch 0 (File by file) is merged
     batches = {}
     batch_order = []
     
-    # First, find all batches
+    # 1. Collect existing batches from files
     for d in datasets:
         bid = d.get('batch_id', 0)
-        # Force name for ID 0
         if bid == 0:
             bname = "📄 File by file import"
         else:
@@ -433,18 +455,35 @@ if datasets:
             if bid not in batch_order:
                 batch_order.append(bid)
         batches[bid]['files'].append(d)
-        
+    
+    # 2. Add empty custom batches
+    if 'custom_batches' in st.session_state:
+        for bid, bname in st.session_state.custom_batches.items():
+            if bid not in batches:
+                batches[bid] = {'name': bname, 'files': []}
+                batch_order.append(bid)
+
     # Display "File by file" first if it exists
     if 0 in batches:
         with st.sidebar.expander(batches[0]['name'], expanded=True):
             for d in batches[0]['files']:
-                c_name, c_del = st.columns([0.85, 0.15])
+                c_name, c_act = st.columns([0.7, 0.3])
                 with c_name:
                     st.text(f"📄 {d['fileName']}")
-                with c_del:
-                    if st.button("✕", key=f"rm_{d['id']}", help="Remove file"):
-                        st.session_state.all_datasets.remove(d)
-                        st.rerun()
+                with c_act:
+                    if organize_mode:
+                        # Move Action
+                        all_batch_options = {bid: info['name'] for bid, info in batches.items() if bid != 0}
+                        if all_batch_options:
+                            target_bid = st.selectbox("Move", options=list(all_batch_options.keys()), format_func=lambda x: all_batch_options[x], key=f"mv_{d['id']}", label_visibility="collapsed")
+                            if st.button("Go", key=f"go_{d['id']}"):
+                                d['batch_id'] = target_bid
+                                d['batch_name'] = all_batch_options[target_bid]
+                                st.rerun()
+                    else:
+                        if st.button("✕", key=f"rm_{d['id']}", help="Remove file"):
+                            st.session_state.all_datasets.remove(d)
+                            st.rerun()
     
     # Display other batches
     for bid in batch_order:
@@ -462,16 +501,35 @@ if datasets:
                 for d in st.session_state.all_datasets:
                     if d.get('batch_id') == bid:
                         d['batch_name'] = new_name
+                # Update custom batch name if exists
+                if 'custom_batches' in st.session_state and bid in st.session_state.custom_batches:
+                    st.session_state.custom_batches[bid] = new_name
                 st.rerun()
                 
             for d in batches[bid]['files']:
-                c_name, c_del = st.columns([0.85, 0.15])
+                c_name, c_act = st.columns([0.7, 0.3])
                 with c_name:
                     st.text(f"📄 {d['fileName']}")
-                with c_del:
-                    if st.button("✕", key=f"rm_{d['id']}", help="Remove file"):
-                        st.session_state.all_datasets.remove(d)
-                        st.rerun()
+                with c_act:
+                    if organize_mode:
+                        # Move Action
+                        all_batch_options = {b: info['name'] for b, info in batches.items() if b != bid}
+                        # Add File by File as option
+                        all_batch_options[0] = "📄 File by file import"
+                        
+                        if all_batch_options:
+                            target_bid = st.selectbox("Move", options=list(all_batch_options.keys()), format_func=lambda x: all_batch_options[x], key=f"mv_{d['id']}", label_visibility="collapsed")
+                            if st.button("Go", key=f"go_{d['id']}"):
+                                d['batch_id'] = target_bid
+                                if target_bid == 0:
+                                    d['batch_name'] = "📄 File by file import"
+                                else:
+                                    d['batch_name'] = batches[target_bid]['name']
+                                st.rerun()
+                    else:
+                        if st.button("✕", key=f"rm_{d['id']}", help="Remove file"):
+                            st.session_state.all_datasets.remove(d)
+                            st.rerun()
     
     st.sidebar.caption("⚠️ Refreshing the page will clear the data.")
 
@@ -480,13 +538,7 @@ else:
     st.stop()
 
 # --- Sidebar: Footer ---
-st.sidebar.markdown("---")
-st.sidebar.markdown("""
-**Author:** Amir MEDDAS  
-*C2N - Centre de Nanosciences et de Nanotechnologies*  
-*LPS - Laboratoire de Physique des Solides*  
-[![LinkedIn](https://img.shields.io/badge/LinkedIn-0077B5?style=for-the-badge&logo=linkedin&logoColor=white)](https://www.linkedin.com/in/amir-meddas-80876424b/)
-""")
+# (Moved to top)
 
 # -----------------------------------------------------------------------------
 # PLOTTING INTERFACE
@@ -530,8 +582,14 @@ def create_plot_interface(plot_id: str, available_datasets: List[Dict[str, Any]]
         # Header with Actions
         c_head1, c_head2, c_head3, c_head4 = st.columns([0.55, 0.15, 0.15, 0.15], vertical_alignment="center")
         with c_head1:
-            # Editable Plot Name
-            st.text_input("Plot Name", value=f"Plot {plot_id}", key=f"pname_{plot_id}", label_visibility="collapsed")
+            # Editable Plot Name (Styled as Header)
+            c_h_text, c_h_edit = st.columns([0.85, 0.15], vertical_alignment="center")
+            with c_h_text:
+                plot_name = st.session_state.get(f"pname_{plot_id}", f"Plot {plot_id}")
+                st.markdown(f"### {plot_name}")
+            with c_h_edit:
+                with st.popover("✏️", help="Rename Plot"):
+                    st.text_input("Name", value=plot_name, key=f"pname_{plot_id}")
         
         # Add Button
         with c_head2:
@@ -647,10 +705,27 @@ def create_plot_interface(plot_id: str, available_datasets: List[Dict[str, Any]]
 
         # File Selector (Multiselect) - Only show if not already shown in Custom Mode
         if analysis_mode != "Custom Columns":
-            options = [d['label'] for d in available_datasets]
-            default_sel = [] # Default to empty selection
-            selected_labels = st.multiselect(f"Select Curves for Plot {plot_id}", options, default=default_sel, key=f"sel_{plot_id}")
-            selected_datasets = [d for d, label in zip(available_datasets, options) if label in selected_labels]
+            # Filter by Folder (Batch)
+            # Get unique batches
+            unique_batches = {d.get('batch_id', 0): d.get('batch_name', 'Unknown') for d in available_datasets}
+            # Add "All" option
+            batch_options = ["All Folders"] + list(unique_batches.values())
+            
+            selected_batch_name = st.selectbox("Filter by Folder", batch_options, index=0, key=f"batch_filter_{plot_id}")
+            
+            # Filter datasets
+            if selected_batch_name != "All Folders":
+                filtered_datasets = [d for d in available_datasets if d.get('batch_name') == selected_batch_name]
+            else:
+                filtered_datasets = available_datasets
+            
+            # Use Raw Filenames for Selection
+            options = [d['fileName'] for d in filtered_datasets]
+            default_sel = [] 
+            selected_filenames = st.multiselect(f"Select Curves for Plot {plot_id}", options, default=default_sel, key=f"sel_{plot_id}")
+            
+            # Map back to dataset objects
+            selected_datasets = [d for d in filtered_datasets if d['fileName'] in selected_filenames]
 
         if not selected_datasets:
             st.info("Select at least one file to display the plot.")
@@ -660,15 +735,11 @@ def create_plot_interface(plot_id: str, available_datasets: List[Dict[str, Any]]
         custom_legends = {}
         with st.expander("🖊️ Legend Labels", expanded=False):
             for d in selected_datasets:
-                # Default legend logic
-                if d['temperatureK']:
-                    t_val = int(math.ceil(d['temperatureK']))
-                    default_leg = f"{t_val}K"
-                else:
-                    default_leg = d['fileName']
+                # Default legend logic: Use Smart Label
+                default_leg = d['label']
                 
                 # Input
-                custom_leg = st.text_input(f"Label for {d['label']}", value=default_leg, key=f"leg_{plot_id}_{d['id']}")
+                custom_leg = st.text_input(f"Label for {d['fileName']}", value=default_leg, key=f"leg_{plot_id}_{d['id']}")
                 custom_legends[d['id']] = custom_leg
 
         # --- Customization ---
