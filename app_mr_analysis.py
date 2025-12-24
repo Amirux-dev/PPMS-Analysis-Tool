@@ -1008,10 +1008,11 @@ def create_plot_interface(plot_id: str, available_datasets: List[Dict[str, Any]]
     """Creates a self-contained plotting interface and returns the figure."""
     
     with st.container(border=True):
-        # Header with Actions
-        c_head_title, c_head_actions = st.columns([0.65, 0.25], vertical_alignment="center")
+        # Header with Actions - Flattened Layout for Robustness
+        # Using a high ratio (15:1) forces the button columns to be minimal width, keeping them compact and square-ish.
+        c_title, c_ren, c_add, c_rem, c_dup = st.columns([15, 1, 1, 1, 1], vertical_alignment="center", gap="small")
         
-        with c_head_title:
+        with c_title:
             # Plot Name or Edit Input
             plot_name = st.session_state.get(f"pname_{plot_id}", f"Plot {plot_id}")
             if st.session_state.get(f"ren_mode_{plot_id}", False):
@@ -1019,17 +1020,14 @@ def create_plot_interface(plot_id: str, available_datasets: List[Dict[str, Any]]
             else:
                 st.markdown(f"<h3 style='margin: 0; padding: 0; line-height: 1.5;'>{plot_name}</h3>", unsafe_allow_html=True)
         
-        with c_head_actions:
-            # Action Buttons
-            b_ren, b_add, b_rem, b_dup = st.columns(4, gap="small")
-            with b_ren:
-                st.button("✏️", key=f"ren_btn_{plot_id}", help="Rename Plot", on_click=toggle_rename_callback, args=(plot_id,))
-            with b_add:
-                st.button("➕", key=f"add_btn_{plot_id}", help="Add a new plot", on_click=add_plot_callback)
-            with b_rem:
-                st.button("➖", key=f"del_btn_{plot_id}", help="Remove this plot", on_click=remove_plot_callback, args=(plot_id,))
-            with b_dup:
-                st.button("📋", key=f"dup_{plot_id}", help="Duplicate this plot", on_click=duplicate_plot_callback, args=(plot_id,))
+        with c_ren:
+            st.button("✏️", key=f"ren_btn_{plot_id}", help="Rename Plot", on_click=toggle_rename_callback, args=(plot_id,), use_container_width=True)
+        with c_add:
+            st.button("➕", key=f"add_btn_{plot_id}", help="Add a new plot", on_click=add_plot_callback, use_container_width=True)
+        with c_rem:
+            st.button("➖", key=f"del_btn_{plot_id}", help="Remove this plot", on_click=remove_plot_callback, args=(plot_id,), use_container_width=True)
+        with c_dup:
+            st.button("📋", key=f"dup_{plot_id}", help="Duplicate this plot", on_click=duplicate_plot_callback, args=(plot_id,), use_container_width=True)
         
         # Row 0: Analysis Mode
         analysis_mode = persistent_selectbox(
