@@ -10,6 +10,7 @@ import re
 import statistics
 import os
 import uuid
+import pickle
 from typing import List, Dict, Any, Optional, Tuple
 
 # Set page config to wide mode by default
@@ -390,6 +391,48 @@ def persistent_input(widget_func, persistent_key, **kwargs):
     store[persistent_key] = val
     return val
 
+# -----------------------------------------------------------------------------
+# SESSION PERSISTENCE
+# -----------------------------------------------------------------------------
+
+STATE_FILE = "session_state.pkl"
+
+def save_session_state():
+    """Saves the current session state to a local pickle file."""
+    state_to_save = {
+        'all_datasets': st.session_state.all_datasets,
+        'plot_ids': st.session_state.plot_ids,
+        'next_plot_id': st.session_state.next_plot_id,
+        'custom_batches': st.session_state.custom_batches,
+        'persistent_values': st.session_state.get('persistent_values', {}),
+        'batch_counter': st.session_state.batch_counter
+    }
+    try:
+        with open(STATE_FILE, 'wb') as f:
+            pickle.dump(state_to_save, f)
+    except Exception as e:
+        print(f"Error saving state: {e}")
+
+def load_session_state():
+    """Loads session state from local pickle file if it exists."""
+    if os.path.exists(STATE_FILE):
+        try:
+            with open(STATE_FILE, 'rb') as f:
+                saved_state = pickle.load(f)
+            
+            # Restore if keys are missing or empty
+            if not st.session_state.all_datasets and saved_state.get('all_datasets'):
+                st.session_state.all_datasets = saved_state.get('all_datasets', [])
+                st.session_state.plot_ids = saved_state.get('plot_ids', [1])
+                st.session_state.next_plot_id = saved_state.get('next_plot_id', 2)
+                st.session_state.custom_batches = saved_state.get('custom_batches', {})
+                st.session_state.persistent_values = saved_state.get('persistent_values', {})
+                st.session_state.batch_counter = saved_state.get('batch_counter', 0)
+                return True
+        except Exception as e:
+            st.error(f"Error loading state: {e}")
+    return False
+
 def recover_session_state():
     """Recover plot_ids and next_plot_id from persistent_values if they seem lost."""
     if 'persistent_values' not in st.session_state:
@@ -430,6 +473,10 @@ def init_session_state():
     for key, value in defaults.items():
         if key not in st.session_state:
             st.session_state[key] = value
+
+    # Try to load from disk if we just initialized (empty datasets)
+    if not st.session_state.all_datasets:
+        load_session_state()
 
 init_session_state()
 recover_session_state()
@@ -500,6 +547,7 @@ if uploaded_files:
             st.error(f"Error parsing {uploaded_file.name}: {e}")
     
     if new_files_count > 0:
+        save_session_state()
         st.sidebar.success(f"Added {new_files_count} new files.")
         st.session_state.uploader_key += 1
         st.rerun()
@@ -521,6 +569,7 @@ def create_folder_callback():
         new_id += 1
         
     st.session_state.custom_batches[new_id] = f"📂 {new_name}"
+    save_session_state()
 
 def move_file_callback(file_id, target_bid, target_name):
     for d in st.session_state.all_datasets:
@@ -534,6 +583,7 @@ def move_file_callback(file_id, target_bid, target_name):
         if key.startswith("sel_"):
             if isinstance(st.session_state[key], list):
                 st.session_state[key] = list(st.session_state[key])
+    save_session_state()
 
 def delete_file_callback(file_id):
     # Find the file name before deleting
@@ -556,6 +606,7 @@ def delete_file_callback(file_id):
                 else:
                     new_selection = current_selection
                 st.session_state[key] = new_selection
+    save_session_state()
 
 def delete_batch_callback(batch_id):
     # Identify files to be deleted
@@ -576,6 +627,7 @@ def delete_batch_callback(batch_id):
                 if isinstance(current_selection, list):
                     new_selection = [f for f in current_selection if f not in files_to_delete]
                     st.session_state[key] = new_selection
+    save_session_state()
 
 def move_files_batch_callback(file_ids, target_bid, target_name):
     """Move multiple files to a target folder."""
@@ -589,6 +641,7 @@ def move_files_batch_callback(file_ids, target_bid, target_name):
         if key.startswith("sel_"):
             if isinstance(st.session_state[key], list):
                 st.session_state[key] = list(st.session_state[key])
+    save_session_state()
 
 def delete_files_batch_callback(file_ids):
     """Delete multiple files."""
@@ -604,6 +657,7 @@ def delete_files_batch_callback(file_ids):
             if isinstance(current_selection, list):
                 new_selection = [f for f in current_selection if f not in files_to_delete]
                 st.session_state[key] = new_selection
+    save_session_state()
 
 # Create New Folder UI
 with st.sidebar.popover("➕ Create New Folder", width='stretch'):
@@ -630,6 +684,7 @@ def rename_batch_callback(batch_id, old_name):
         if key.startswith("batch_filter_") or key.startswith("batch_filter_cust_"):
             if st.session_state[key] == old_name:
                 st.session_state[key] = new_name
+    save_session_state()
 
 # --- Dialogs for File Management ---
 dialog_decorator = None
@@ -826,7 +881,12 @@ if datasets or batches:
             st.session_state.all_datasets = []
             st.session_state.batch_counter = 0
             st.session_state.custom_batches = {}
+            save_session_state()
             st.rerun()
+
+    if st.sidebar.button("💾 Save Analysis State", help="Force save current state to disk", width='stretch'):
+        save_session_state()
+        st.toast("State saved manually!", icon="💾")
 
     # --- Batch Actions Button ---
     if dialog_decorator:
@@ -945,6 +1005,7 @@ def add_plot_callback():
     while new_id in existing_ids:
         new_id += 1
     st.session_state.plot_ids.append(new_id)
+    save_session_state()
 
 def remove_plot_callback(plot_id_str):
     pid = int(plot_id_str)
@@ -969,13 +1030,30 @@ def remove_plot_callback(plot_id_str):
                     p_keys_to_del.append(key)
             for key in p_keys_to_del:
                 del p_store[key]
+    save_session_state()
 
 def toggle_rename_callback(plot_id):
+    # Save title if we are closing edit mode
+    if st.session_state.get(f"ren_mode_{plot_id}", False):
+         key = f"pname_{plot_id}"
+         if key in st.session_state:
+            if 'persistent_values' not in st.session_state:
+                st.session_state['persistent_values'] = {}
+            st.session_state['persistent_values'][key] = st.session_state[key]
+
     key = f"ren_mode_{plot_id}"
     st.session_state[key] = not st.session_state.get(key, False)
 
 def close_rename_callback(plot_id):
     st.session_state[f"ren_mode_{plot_id}"] = False
+    
+    # Persist Title
+    key = f"pname_{plot_id}"
+    if key in st.session_state:
+        if 'persistent_values' not in st.session_state:
+            st.session_state['persistent_values'] = {}
+        st.session_state['persistent_values'][key] = st.session_state[key]
+    save_session_state()
 
 def duplicate_plot_callback(plot_id):
     existing_ids = set(st.session_state.plot_ids)
@@ -1013,6 +1091,7 @@ def duplicate_plot_callback(plot_id):
         elif f"_{plot_id}_" in key:
             new_key = key.replace(f"_{plot_id}_", f"_{new_id}_")
             st.session_state[new_key] = st.session_state[key]
+    save_session_state()
 
 def get_batch_map(datasets: List[Dict[str, Any]], custom_batches: Dict[int, str] = None) -> Dict[Any, str]:
     """Returns a mapping of batch_id to batch_name."""
@@ -1041,9 +1120,20 @@ def create_plot_interface(plot_id: str, available_datasets: List[Dict[str, Any]]
         
         with c_title:
             # Plot Name or Edit Input
-            plot_name = st.session_state.get(f"pname_{plot_id}", f"Plot {plot_id}")
+            p_key = f"pname_{plot_id}"
+            
+            # Restore from persistence if available
+            if 'persistent_values' in st.session_state and p_key in st.session_state['persistent_values']:
+                plot_name = st.session_state['persistent_values'][p_key]
+            else:
+                plot_name = st.session_state.get(p_key, f"Plot {plot_id}")
+
             if st.session_state.get(f"ren_mode_{plot_id}", False):
-                st.text_input("Name", value=plot_name, key=f"pname_{plot_id}", label_visibility="collapsed", on_change=close_rename_callback, args=(plot_id,))
+                # When entering edit mode, ensure session state has the value so the widget picks it up correctly
+                if p_key not in st.session_state:
+                     st.session_state[p_key] = plot_name
+                     
+                st.text_input("Name", value=plot_name, key=p_key, label_visibility="collapsed", on_change=close_rename_callback, args=(plot_id,))
             else:
                 st.markdown(f"<h3 style='margin: 0; padding: 0; line-height: 1.5;'>{plot_name}</h3>", unsafe_allow_html=True)
         
@@ -1257,7 +1347,7 @@ def create_plot_interface(plot_id: str, available_datasets: List[Dict[str, Any]]
             
         with c_proc:
             if analysis_mode in ["Standard MR Analysis", "Standard R-H Analysis"]:
-                symmetrize = persistent_input(st.toggle, f"sym_{plot_id}", label="Symmetrize", value=False, help="Mirror positive field data to negative field (Force Symmetry)")
+                symmetrize = persistent_input(st.toggle, f"sym_{plot_id}", label="Symmetrize", value=False, help="Fold all data to positive field (|H|) and mirror to create a symmetric loop using all points.")
                 plot_derivative = False
             elif analysis_mode == "Standard R-T Analysis":
                 symmetrize = False
@@ -1389,22 +1479,18 @@ def create_plot_interface(plot_id: str, available_datasets: List[Dict[str, Any]]
             if analysis_mode in ["Standard MR Analysis", "Standard R-H Analysis"]:
                 df = pd.DataFrame({"H_T": d["H_T"], "R": d["R"]})
                 
-                # Symmetrization (Mirror Positive Field Data)
+                # Symmetrization (Fold and Mirror)
                 if symmetrize:
-                    # Filter Positive Field Data
-                    df_pos = df[df["H_T"] >= 0].copy()
+                    # 1. Fold all data to positive field (H -> |H|)
+                    df["H_T"] = df["H_T"].abs()
                     
-                    if not df_pos.empty:
-                        # Create Negative Field Data (Mirror)
-                        df_neg = df_pos.copy()
-                        df_neg["H_T"] = -df_neg["H_T"]
-                        
-                        # Combine and Sort
-                        df = pd.concat([df_neg, df_pos], ignore_index=True)
-                        df = df.sort_values(by="H_T")
-                    else:
-                        # Fallback if no positive data
-                        st.warning(f"Cannot symmetrize {d['fileName']}: No positive field data found.")
+                    # 2. Create Negative Field Data (Mirror)
+                    df_neg = df.copy()
+                    df_neg["H_T"] = -df_neg["H_T"]
+                    
+                    # 3. Combine and Sort
+                    df = pd.concat([df_neg, df], ignore_index=True)
+                    df = df.sort_values(by="H_T")
 
                 # Calculate R0 (For MR and R-H Analysis)
                 r0 = 1.0
@@ -1663,7 +1749,7 @@ def create_plot_interface(plot_id: str, available_datasets: List[Dict[str, Any]]
                         y=y_pfit,
                         mode='lines',
                         name=f"ParaFit {legend_name}",
-                        line=dict(dash='dot', width=2, color='blue'),
+                        line=dict(dash='dot', width=3, color='green'),
                         hoverinfo='skip'
                     ))
                     
