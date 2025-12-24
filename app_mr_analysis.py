@@ -542,23 +542,48 @@ if uploaded_files:
     is_batch = len(uploaded_files) > 1
     
     if is_batch:
-        # Calculate next available batch ID
-        existing_batch_ids = set(d.get('batch_id', 0) for d in st.session_state.all_datasets)
-        existing_batch_ids.update(st.session_state.custom_batches.keys())
-        existing_batch_ids.discard(0)
-        
-        batch_id = 1
-        while batch_id in existing_batch_ids:
-            batch_id += 1
-        
-        # Guess folder name from prefix
+        # 1. Determine Batch Name from prefix
         filenames = [f.name for f in uploaded_files]
         prefix = os.path.commonprefix(filenames)
         
+        target_batch_name = None
         if prefix:
-            batch_name = f"📂 {prefix.strip('_- ')}"
+            target_batch_name = f"📂 {prefix.strip('_- ')}"
+            
+        # 2. Check if a batch with this name already exists
+        batch_id = None
+        if target_batch_name:
+            # Check in existing datasets
+            for d in st.session_state.all_datasets:
+                if d.get('batch_name') == target_batch_name:
+                    batch_id = d.get('batch_id')
+                    break
+            
+            # Check in custom batches
+            if batch_id is None and 'custom_batches' in st.session_state:
+                for bid, bname in st.session_state.custom_batches.items():
+                    if bname == target_batch_name:
+                        batch_id = bid
+                        break
+        
+        # 3. If found, use it. If not, create new.
+        if batch_id is not None:
+            batch_name = target_batch_name
         else:
-            batch_name = f"📂 Batch Import #{batch_id}"
+            # Calculate next available batch ID
+            existing_batch_ids = set(d.get('batch_id', 0) for d in st.session_state.all_datasets)
+            if 'custom_batches' in st.session_state:
+                existing_batch_ids.update(st.session_state.custom_batches.keys())
+            existing_batch_ids.discard(0)
+            
+            batch_id = 1
+            while batch_id in existing_batch_ids:
+                batch_id += 1
+            
+            if target_batch_name:
+                batch_name = target_batch_name
+            else:
+                batch_name = f"📂 Batch Import #{batch_id}"
     else:
         batch_id = 0
         batch_name = "📄 File by file import"
