@@ -15,37 +15,6 @@ from typing import List, Dict, Any, Optional, Tuple
 # Set page config to wide mode by default
 st.set_page_config(layout="wide", page_title="PPMS Analysis Tool")
 
-# Inject CSS for Centered Headers (Expander & Popover) & Buttons
-st.markdown("""
-<style>
-    /* Center Popover Buttons */
-    div[data-testid="stPopover"] > button {
-        width: 100%;
-        justify-content: center !important;
-    }
-
-    /* Center Regular Buttons (like Add/Remove Plot) */
-    div[data-testid="stButton"] > button {
-        width: 100%;
-        justify-content: center !important;
-    }
-
-    /* Center Expander Headers */
-    div[data-testid="stExpander"] details > summary {
-        justify-content: center !important;
-    }
-    
-    div[data-testid="stExpander"] details > summary > div {
-        flex: 0 1 auto !important;
-    }
-    
-    div[data-testid="stExpander"] details > summary p {
-        text-align: center !important;
-        margin-bottom: 0 !important;
-    }
-</style>
-""", unsafe_allow_html=True)
-
 
 # -----------------------------------------------------------------------------
 # DATA PARSING & EXTRACTION
@@ -991,11 +960,11 @@ def create_plot_interface(plot_id: str, available_datasets: List[Dict[str, Any]]
                 st.button("📋", key=f"dup_{plot_id}", help="Duplicate this plot", on_click=duplicate_plot_callback, args=(plot_id,), width='stretch')
         
         # Row 0: Analysis Mode
-        analysis_mode = st.selectbox(
+        analysis_mode = persistent_selectbox(
             "Analysis Mode",
             ["Custom Columns", "Standard MR Analysis", "Standard R-T Analysis"],
             index=0,
-            key=f"mode_{plot_id}"
+            persistent_key=f"mode_{plot_id}"
         )
         
         # --- Unified File Selection ---
@@ -1109,37 +1078,37 @@ def create_plot_interface(plot_id: str, available_datasets: List[Dict[str, Any]]
         
         if analysis_mode == "Standard MR Analysis":
             # R0 Method
-            r0_method = st.selectbox(
+            r0_method = persistent_selectbox(
                 "R0 Calculation Method",
                 ["Closest to 0T", "Mean within Window", "First Point"],
                 index=0,
-                key=f"r0_meth_{plot_id}"
+                persistent_key=f"r0_meth_{plot_id}"
             )
             r0_window = 0.01
             if r0_method == "Mean within Window":
                 r0_window = st.number_input("Zero Field Window (T)", value=0.01, step=0.005, format="%.4f", key=f"r0_win_{plot_id}")
 
             with c1:
-                y_axis_mode = st.selectbox(
+                y_axis_mode = persistent_selectbox(
                     "Y-Axis Mode",
                     ["Magnetoresistance (MR %)", "Resistance (Ω)", "Normalized (R/R0)", "Derivative (dR/dH)"],
                     index=0,
-                    key=f"y_mode_{plot_id}"
+                    persistent_key=f"y_mode_{plot_id}"
                 )
             with c2:
-                x_axis_unit = st.selectbox(
+                x_axis_unit = persistent_selectbox(
                     "X-Axis Unit",
                     ["Tesla (T)", "Oersted (Oe)"],
                     index=0,
-                    key=f"x_unit_{plot_id}"
+                    persistent_key=f"x_unit_{plot_id}"
                 )
         elif analysis_mode == "Standard R-T Analysis":
             with c1:
-                y_axis_mode = st.selectbox(
+                y_axis_mode = persistent_selectbox(
                     "Y-Axis Mode",
                     ["Resistance (Ω)", "Normalized (R/R_300K)", "Derivative (dR/dT)"],
                     index=0,
-                    key=f"y_mode_{plot_id}"
+                    persistent_key=f"y_mode_{plot_id}"
                 )
             with c2:
                 # Use disabled selectbox for alignment
@@ -1163,10 +1132,24 @@ def create_plot_interface(plot_id: str, available_datasets: List[Dict[str, Any]]
             if has_oe:
                 display_cols.append("Magnetic Field (T)")
 
+            # Smart Defaults for Custom Columns
+            def get_smart_index(cols, keywords):
+                for i, c in enumerate(cols):
+                    if any(k in c.lower() for k in keywords):
+                        return i
+                return 0
+
+            default_y_idx = get_smart_index(display_cols, ["resist", "ohm", "voltage"])
+            default_x_idx = get_smart_index(display_cols, ["temp", "field", "tesla", "oe"])
+            
+            # Ensure X and Y are different if possible
+            if default_x_idx == default_y_idx and len(display_cols) > 1:
+                default_x_idx = (default_y_idx + 1) % len(display_cols)
+
             with c1:
-                custom_y_col = persistent_selectbox("Y Column", display_cols, index=0 if display_cols else 0, persistent_key=f"y_col_{plot_id}")
+                custom_y_col = persistent_selectbox("Y Column", display_cols, index=default_y_idx, persistent_key=f"y_col_{plot_id}")
             with c2:
-                custom_x_col = persistent_selectbox("X Column", display_cols, index=1 if len(display_cols) > 1 else 0, persistent_key=f"x_col_{plot_id}")
+                custom_x_col = persistent_selectbox("X Column", display_cols, index=default_x_idx, persistent_key=f"x_col_{plot_id}")
             
             # Oe to T conversion removed (handled by virtual column)
 
