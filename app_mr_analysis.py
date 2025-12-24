@@ -312,51 +312,52 @@ def persistent_selectbox(label, options, persistent_key, **kwargs):
     """
     A wrapper around st.selectbox that persists its value across reruns 
     even when the widget key changes (e.g. due to uploader_key rotation).
+    Uses a dedicated dictionary in session_state to store values safely.
     """
+    # 1. Initialize persistent store if needed
+    if 'persistent_values' not in st.session_state:
+        st.session_state['persistent_values'] = {}
+    
+    store = st.session_state['persistent_values']
     uploader_key = st.session_state.get('uploader_key', 0)
     widget_key = f"{persistent_key}_{uploader_key}"
     
-    # 1. Determine the value to show
-    # Priority: 
-    # a) Current widget value (if it exists in session state - i.e. user just changed it)
-    # b) Persistent value (from previous runs/keys)
-    # c) Default index
-    
-    index_to_use = kwargs.get('index', 0)
-    
+    # 2. Check if we have a value from the CURRENT widget (user interaction)
     if widget_key in st.session_state:
-        # User interacted with THIS widget version
-        current_val = st.session_state[widget_key]
-        # Update persistent store
-        st.session_state[persistent_key] = current_val
-    elif persistent_key in st.session_state:
-        # New widget version (e.g. after upload), load from persistent store
-        current_val = st.session_state[persistent_key]
-    else:
-        # First time ever
-        if 0 <= index_to_use < len(options):
-            current_val = options[index_to_use]
+        store[persistent_key] = st.session_state[widget_key]
+        
+    # 3. Retrieve the value to display
+    # Priority: Store > Default
+    current_val = store.get(persistent_key)
+    
+    # 4. Validate current value against options
+    if current_val not in options:
+        # Fallback to default
+        default_idx = kwargs.get('index', 0)
+        if 0 <= default_idx < len(options):
+            current_val = options[default_idx]
         elif options:
             current_val = options[0]
         else:
             current_val = None
-            
-    # Calculate index for Streamlit
-    try:
-        if current_val in options:
-            index_to_use = options.index(current_val)
-    except:
-        pass
         
-    # Remove conflicting kwargs
+        # Update store with valid default
+        store[persistent_key] = current_val
+
+    # 5. Calculate index for Streamlit
+    idx = 0
+    if current_val in options:
+        idx = options.index(current_val)
+        
+    # 6. Clean kwargs
     kwargs.pop('index', None)
     kwargs.pop('key', None)
     
-    # Render widget
-    selected_val = st.selectbox(label, options, index=index_to_use, key=widget_key, **kwargs)
+    # 7. Render widget
+    selected_val = st.selectbox(label, options, index=idx, key=widget_key, **kwargs)
     
-    # Ensure persistent state is synced (crucial for the very first run or after reset)
-    st.session_state[persistent_key] = selected_val
+    # 8. Sync back to store (handles the case where we just initialized with default)
+    store[persistent_key] = selected_val
     
     return selected_val
 
