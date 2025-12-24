@@ -329,15 +329,10 @@ uploaded_files = st.sidebar.file_uploader(
     help="Drag and drop files or folders here. They will be automatically processed."
 )
 
-# --- Sidebar: Footer (Always Visible) ---
-st.sidebar.markdown("---")
-st.sidebar.markdown("""
-**Author:** Amir MEDDAS  
-*C2N - Centre de Nanosciences et de Nanotechnologies*  
-*LPS - Laboratoire de Physique des Solides*  
-[![LinkedIn](https://img.shields.io/badge/LinkedIn-0077B5?style=for-the-badge&logo=linkedin&logoColor=white)](https://www.linkedin.com/in/amir-meddas-80876424b/)
-""")
-st.sidebar.markdown("---")
+# --- Sidebar: Footer (Moved to bottom) ---
+# st.sidebar.markdown("---")
+# ...
+
 
 # Process Uploaded Files Automatically
 if uploaded_files:
@@ -427,12 +422,12 @@ if datasets:
     # Explorer UI
     st.sidebar.markdown("### Loaded Data")
     
-    # Clear All Button (Left Aligned)
-    c_info, c_clear = st.sidebar.columns([1, 1])
+    # Clear All Button (Right Aligned)
+    c_info, c_clear = st.sidebar.columns([0.4, 0.6])
     with c_info:
         st.write(f"**Total Files:** {len(datasets)}")
     with c_clear:
-        if st.button("🗑️ Clear All", help="Remove all loaded data"):
+        if st.button("🗑️ Clear All", help="Remove all loaded data", use_container_width=True):
             st.session_state.all_datasets = []
             st.session_state.batch_counter = 0
             if 'custom_batches' in st.session_state: del st.session_state.custom_batches
@@ -532,9 +527,24 @@ if datasets:
                             st.rerun()
     
     st.sidebar.caption("⚠️ Refreshing the page will clear the data.")
+    
+    st.sidebar.markdown("---")
+    st.sidebar.markdown("""
+**Author:** Amir MEDDAS  
+*C2N - Centre de Nanosciences et de Nanotechnologies*  
+*LPS - Laboratoire de Physique des Solides*  
+[![LinkedIn](https://img.shields.io/badge/LinkedIn-0077B5?style=for-the-badge&logo=linkedin&logoColor=white)](https://www.linkedin.com/in/amir-meddas-80876424b/)
+""")
 
 else:
     st.sidebar.info("Upload files to begin.")
+    st.sidebar.markdown("---")
+    st.sidebar.markdown("""
+**Author:** Amir MEDDAS  
+*C2N - Centre de Nanosciences et de Nanotechnologies*  
+*LPS - Laboratoire de Physique des Solides*  
+[![LinkedIn](https://img.shields.io/badge/LinkedIn-0077B5?style=for-the-badge&logo=linkedin&logoColor=white)](https://www.linkedin.com/in/amir-meddas-80876424b/)
+""")
     st.stop()
 
 # --- Sidebar: Footer ---
@@ -583,10 +593,11 @@ def create_plot_interface(plot_id: str, available_datasets: List[Dict[str, Any]]
         c_head1, c_head2, c_head3, c_head4 = st.columns([0.55, 0.15, 0.15, 0.15], vertical_alignment="center")
         with c_head1:
             # Editable Plot Name (Styled as Header)
-            c_h_text, c_h_edit = st.columns([0.85, 0.15], vertical_alignment="center")
+            c_h_text, c_h_edit = st.columns([0.9, 0.1], vertical_alignment="center")
             with c_h_text:
                 plot_name = st.session_state.get(f"pname_{plot_id}", f"Plot {plot_id}")
-                st.markdown(f"### {plot_name}")
+                # Use HTML to control margins and style
+                st.markdown(f"<h3 style='margin: 0; padding: 0; line-height: 1.5;'>{plot_name}</h3>", unsafe_allow_html=True)
             with c_h_edit:
                 with st.popover("✏️", help="Rename Plot"):
                     st.text_input("Name", value=plot_name, key=f"pname_{plot_id}")
@@ -660,10 +671,21 @@ def create_plot_interface(plot_id: str, available_datasets: List[Dict[str, Any]]
             ref_cols = []
             
             # File Selector (Multiselect) - Moved up to determine available columns
-            options = [d['label'] for d in available_datasets]
+            
+            # Filter by Folder (Batch)
+            unique_batches = {d.get('batch_id', 0): d.get('batch_name', 'Unknown') for d in available_datasets}
+            batch_options = ["All Folders"] + list(unique_batches.values())
+            selected_batch_name = st.selectbox("Filter by Folder", batch_options, index=0, key=f"batch_filter_cust_{plot_id}")
+            
+            if selected_batch_name != "All Folders":
+                filtered_datasets = [d for d in available_datasets if d.get('batch_name') == selected_batch_name]
+            else:
+                filtered_datasets = available_datasets
+
+            options = [d['label'] for d in filtered_datasets]
             default_sel = [] # Default to empty selection
             selected_labels = st.multiselect(f"Select Curves for Plot {plot_id}", options, default=default_sel, key=f"sel_{plot_id}")
-            selected_datasets = [d for d, label in zip(available_datasets, options) if label in selected_labels]
+            selected_datasets = [d for d in filtered_datasets if d['label'] in selected_labels]
 
             if selected_datasets:
                 # Find common non-empty columns or just take from first
