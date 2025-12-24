@@ -15,6 +15,37 @@ from typing import List, Dict, Any, Optional, Tuple
 # Set page config to wide mode by default
 st.set_page_config(layout="wide", page_title="PPMS Analysis Tool")
 
+# Inject CSS for Centered Headers (Expander & Popover) & Buttons
+st.markdown("""
+<style>
+    /* Center Popover Buttons */
+    div[data-testid="stPopover"] > button {
+        width: 100%;
+        justify-content: center !important;
+    }
+
+    /* Center Regular Buttons (like Add/Remove Plot) */
+    div[data-testid="stButton"] > button {
+        width: 100%;
+        justify-content: center !important;
+    }
+
+    /* Center Expander Headers */
+    div[data-testid="stExpander"] details > summary {
+        justify-content: center !important;
+    }
+    
+    div[data-testid="stExpander"] details > summary > div {
+        flex: 0 1 auto !important;
+    }
+    
+    div[data-testid="stExpander"] details > summary p {
+        text-align: center !important;
+        margin-bottom: 0 !important;
+    }
+</style>
+""", unsafe_allow_html=True)
+
 
 # -----------------------------------------------------------------------------
 # DATA PARSING & EXTRACTION
@@ -393,8 +424,14 @@ if uploaded_files:
     is_batch = len(uploaded_files) > 1
     
     if is_batch:
-        st.session_state.batch_counter += 1
-        batch_id = st.session_state.batch_counter
+        # Calculate next available batch ID
+        existing_batch_ids = set(d.get('batch_id', 0) for d in st.session_state.all_datasets)
+        existing_batch_ids.update(st.session_state.custom_batches.keys())
+        existing_batch_ids.discard(0)
+        
+        batch_id = 1
+        while batch_id in existing_batch_ids:
+            batch_id += 1
         
         # Guess folder name from prefix
         filenames = [f.name for f in uploaded_files]
@@ -436,8 +473,17 @@ organize_mode = True
 # --- Callbacks ---
 def create_folder_callback():
     new_name = st.session_state.get("new_folder_name_input", "New Folder")
-    st.session_state.batch_counter += 1
-    st.session_state.custom_batches[st.session_state.batch_counter] = f"📂 {new_name}"
+    
+    # Calculate next available batch ID
+    existing_batch_ids = set(d.get('batch_id', 0) for d in st.session_state.all_datasets)
+    existing_batch_ids.update(st.session_state.custom_batches.keys())
+    existing_batch_ids.discard(0)
+    
+    new_id = 1
+    while new_id in existing_batch_ids:
+        new_id += 1
+        
+    st.session_state.custom_batches[new_id] = f"📂 {new_name}"
 
 def move_file_callback(file_id, target_bid, target_name):
     for d in st.session_state.all_datasets:
@@ -857,19 +903,32 @@ else:
 # -----------------------------------------------------------------------------
 
 def add_plot_callback():
-    new_id = st.session_state.next_plot_id
+    existing_ids = set(st.session_state.plot_ids)
+    new_id = 1
+    while new_id in existing_ids:
+        new_id += 1
     st.session_state.plot_ids.append(new_id)
-    st.session_state.next_plot_id += 1
 
 def remove_plot_callback(plot_id_str):
     pid = int(plot_id_str)
     if pid in st.session_state.plot_ids:
         st.session_state.plot_ids.remove(pid)
+        
+        # Cleanup session state for this plot
+        keys_to_del = []
+        for key in st.session_state.keys():
+            if key.endswith(f"_{pid}") or f"_{pid}_" in key:
+                keys_to_del.append(key)
+        
+        for key in keys_to_del:
+            del st.session_state[key]
 
 def duplicate_plot_callback(plot_id):
-    new_id = st.session_state.next_plot_id
+    existing_ids = set(st.session_state.plot_ids)
+    new_id = 1
+    while new_id in existing_ids:
+        new_id += 1
     st.session_state.plot_ids.append(new_id)
-    st.session_state.next_plot_id += 1
     
     # Copy state
     for key in list(st.session_state.keys()):
@@ -932,11 +991,11 @@ def create_plot_interface(plot_id: str, available_datasets: List[Dict[str, Any]]
                 st.button("📋", key=f"dup_{plot_id}", help="Duplicate this plot", on_click=duplicate_plot_callback, args=(plot_id,), width='stretch')
         
         # Row 0: Analysis Mode
-        analysis_mode = persistent_selectbox(
+        analysis_mode = st.selectbox(
             "Analysis Mode",
             ["Custom Columns", "Standard MR Analysis", "Standard R-T Analysis"],
             index=0,
-            persistent_key=f"mode_{plot_id}"
+            key=f"mode_{plot_id}"
         )
         
         # --- Unified File Selection ---
@@ -1050,37 +1109,37 @@ def create_plot_interface(plot_id: str, available_datasets: List[Dict[str, Any]]
         
         if analysis_mode == "Standard MR Analysis":
             # R0 Method
-            r0_method = persistent_selectbox(
+            r0_method = st.selectbox(
                 "R0 Calculation Method",
                 ["Closest to 0T", "Mean within Window", "First Point"],
                 index=0,
-                persistent_key=f"r0_meth_{plot_id}"
+                key=f"r0_meth_{plot_id}"
             )
             r0_window = 0.01
             if r0_method == "Mean within Window":
                 r0_window = st.number_input("Zero Field Window (T)", value=0.01, step=0.005, format="%.4f", key=f"r0_win_{plot_id}")
 
             with c1:
-                y_axis_mode = persistent_selectbox(
+                y_axis_mode = st.selectbox(
                     "Y-Axis Mode",
                     ["Magnetoresistance (MR %)", "Resistance (Ω)", "Normalized (R/R0)", "Derivative (dR/dH)"],
                     index=0,
-                    persistent_key=f"y_mode_{plot_id}"
+                    key=f"y_mode_{plot_id}"
                 )
             with c2:
-                x_axis_unit = persistent_selectbox(
+                x_axis_unit = st.selectbox(
                     "X-Axis Unit",
                     ["Tesla (T)", "Oersted (Oe)"],
                     index=0,
-                    persistent_key=f"x_unit_{plot_id}"
+                    key=f"x_unit_{plot_id}"
                 )
         elif analysis_mode == "Standard R-T Analysis":
             with c1:
-                y_axis_mode = persistent_selectbox(
+                y_axis_mode = st.selectbox(
                     "Y-Axis Mode",
                     ["Resistance (Ω)", "Normalized (R/R_300K)", "Derivative (dR/dT)"],
                     index=0,
-                    persistent_key=f"y_mode_{plot_id}"
+                    key=f"y_mode_{plot_id}"
                 )
             with c2:
                 # Use disabled selectbox for alignment
