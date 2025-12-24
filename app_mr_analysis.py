@@ -359,7 +359,11 @@ def persistent_selectbox(label, options, persistent_key, **kwargs):
     selected_val = st.selectbox(label, options, index=idx, key=widget_key, **kwargs)
     
     # 8. Sync back to store (handles the case where we just initialized with default)
-    store[persistent_key] = selected_val
+    if store.get(persistent_key) != selected_val:
+        store[persistent_key] = selected_val
+        save_session_state()
+    else:
+        store[persistent_key] = selected_val
     
     return selected_val
 
@@ -388,7 +392,11 @@ def persistent_input(widget_func, persistent_key, **kwargs):
     val = widget_func(key=widget_key, **kwargs)
     
     # 4. Sync
-    store[persistent_key] = val
+    if store.get(persistent_key) != val:
+        store[persistent_key] = val
+        save_session_state()
+    else:
+        store[persistent_key] = val
     return val
 
 # -----------------------------------------------------------------------------
@@ -399,13 +407,24 @@ STATE_FILE = "session_state.pkl"
 
 def save_session_state():
     """Saves the current session state to a local pickle file."""
+    
+    # Capture plot-specific state that isn't in persistent_values
+    plot_states = {}
+    if 'plot_ids' in st.session_state:
+        for pid in st.session_state.plot_ids:
+            for prefix in ["sel_", "batch_filter_", "pname_", "ren_mode_"]:
+                key = f"{prefix}{pid}"
+                if key in st.session_state:
+                    plot_states[key] = st.session_state[key]
+
     state_to_save = {
         'all_datasets': st.session_state.all_datasets,
         'plot_ids': st.session_state.plot_ids,
         'next_plot_id': st.session_state.next_plot_id,
         'custom_batches': st.session_state.custom_batches,
         'persistent_values': st.session_state.get('persistent_values', {}),
-        'batch_counter': st.session_state.batch_counter
+        'batch_counter': st.session_state.batch_counter,
+        'plot_states': plot_states
     }
     try:
         with open(STATE_FILE, 'wb') as f:
@@ -428,6 +447,12 @@ def load_session_state():
                 st.session_state.custom_batches = saved_state.get('custom_batches', {})
                 st.session_state.persistent_values = saved_state.get('persistent_values', {})
                 st.session_state.batch_counter = saved_state.get('batch_counter', 0)
+                
+                # Restore plot states
+                if 'plot_states' in saved_state:
+                    for k, v in saved_state['plot_states'].items():
+                        st.session_state[k] = v
+                
                 return True
         except Exception as e:
             st.error(f"Error loading state: {e}")
@@ -976,7 +1001,7 @@ if datasets or batches:
     st.sidebar.markdown("---")
     st.sidebar.markdown("""
 **Author :** Amir MEDDAS  
-*LPS - Laboratoire de Physique des Solides*
+*LPS - Laboratoire de Physique des Solides*<br>
 *C2N - Centre de Nanosciences et de Nanotechnologies*    
 [![LinkedIn](https://img.shields.io/badge/LinkedIn-0077B5?style=for-the-badge&logo=linkedin&logoColor=white)](https://www.linkedin.com/in/amir-meddas-80876424b/)
 """)
@@ -986,7 +1011,7 @@ else:
     st.sidebar.markdown("---")
     st.sidebar.markdown("""
 **Author :** Amir MEDDAS  
-*LPS - Laboratoire de Physique des Solides*                          
+*LPS - Laboratoire de Physique des Solides*<br>
 *C2N - Centre de Nanosciences et de Nanotechnologies*  
 [![LinkedIn](https://img.shields.io/badge/LinkedIn-0077B5?style=for-the-badge&logo=linkedin&logoColor=white)](https://www.linkedin.com/in/amir-meddas-80876424b/)
 """)
@@ -1149,7 +1174,7 @@ def create_plot_interface(plot_id: str, available_datasets: List[Dict[str, Any]]
         # Row 0: Analysis Mode
         analysis_mode = persistent_selectbox(
             "Analysis Mode",
-            ["Custom Columns", "Standard MR Analysis", "Standard R-H Analysis", "Standard R-T Analysis"],
+            ["Custom Columns", "Standard MR Analysis", "Standard R-T Analysis"],
             index=0,
             persistent_key=f"mode_{plot_id}"
         )
@@ -1199,7 +1224,8 @@ def create_plot_interface(plot_id: str, available_datasets: List[Dict[str, Any]]
             options, 
             format_func=format_batch,
             index=options.index(st.session_state[persistent_batch_key]),
-            key=widget_batch_key
+            key=widget_batch_key,
+            on_change=save_session_state
         )
         
         if selected_batch_id != "ALL":
@@ -1237,7 +1263,8 @@ def create_plot_interface(plot_id: str, available_datasets: List[Dict[str, Any]]
             f"Select Curves for Plot {plot_id}", 
             options=combined_options,
             default=current_selection,
-            key=widget_sel_key
+            key=widget_sel_key,
+            on_change=save_session_state
         )
         
         # Map back to datasets
@@ -1484,11 +1511,17 @@ def create_plot_interface(plot_id: str, available_datasets: List[Dict[str, Any]]
                     # 1. Fold all data to positive field (H -> |H|)
                     df["H_T"] = df["H_T"].abs()
                     
-                    # 2. Create Negative Field Data (Mirror)
+                    # 2. Average data with same H (to remove hysteresis/oscillations)
+                    # Round H to avoid floating point issues (e.g. 1e-5 T resolution)
+                    df["H_round"] = df["H_T"].round(5) 
+                    df = df.groupby("H_round", as_index=False).mean()
+                    df = df.drop(columns=["H_round"])
+                    
+                    # 3. Create Negative Field Data (Mirror)
                     df_neg = df.copy()
                     df_neg["H_T"] = -df_neg["H_T"]
                     
-                    # 3. Combine and Sort
+                    # 4. Combine and Sort
                     df = pd.concat([df_neg, df], ignore_index=True)
                     df = df.sort_values(by="H_T")
 
