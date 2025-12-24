@@ -558,6 +558,55 @@ if dialog_decorator:
             delete_file_callback(file_data['id'])
             st.rerun()
 
+if dialog_decorator:
+    @dialog_decorator("Batch Actions")
+    def manage_batch_dialog(datasets: List[Dict[str, Any]], batches: Dict[int, Dict[str, Any]]):
+        st.write("Select multiple files to move or delete them at once.")
+        
+        # 1. Select Files
+        # Create a mapping of ID -> Display Name
+        file_options = {d['id']: f"{d['fileName']} ({d.get('batch_name', 'Unknown')})" for d in datasets}
+        
+        selected_ids = st.multiselect(
+            "Select Files",
+            options=list(file_options.keys()),
+            format_func=lambda x: file_options[x],
+            key="dlg_batch_action_files",
+            placeholder="Choose files..."
+        )
+        
+        if selected_ids:
+            st.markdown("---")
+            st.subheader("Move Selected")
+            
+            # Target options (All folders)
+            target_options = {bid: info['name'] for bid, info in batches.items()}
+            # Ensure "File by file" is available
+            if 0 not in target_options:
+                 target_options[0] = "📄 File by file import"
+                 
+            target_bid = st.selectbox(
+                "Target Folder", 
+                options=list(target_options.keys()), 
+                format_func=lambda x: target_options[x], 
+                key="dlg_batch_move_target"
+            )
+            
+            target_name = target_options[target_bid]
+            if st.button("Move Files", key="dlg_batch_move_btn", type="primary"):
+                move_files_batch_callback(selected_ids, target_bid, target_name)
+                st.rerun()
+                
+            st.markdown("---")
+            st.subheader("Delete Selected")
+            st.warning(f"Are you sure you want to delete {len(selected_ids)} files?")
+            
+            if st.button(f"Delete {len(selected_ids)} Files", key="dlg_batch_delete_btn", type="primary"):
+                delete_files_batch_callback(selected_ids)
+                st.rerun()
+        else:
+            st.info("Please select at least one file.")
+
 def render_file_actions(file_data: Dict[str, Any], current_batch_id: int, all_batches_info: Dict[int, Dict[str, Any]]):
     """Helper to render the Move/Delete actions for a file."""
     # Ensure ID is a string
@@ -666,56 +715,61 @@ if datasets or batches:
             st.session_state.custom_batches = {}
             st.rerun()
 
-    # --- Batch Actions ---
-    with st.sidebar.expander("⚡ Batch Actions", expanded=False):
-        # 1. Select Files
-        # Create a mapping of ID -> Display Name
-        file_options = {d['id']: f"{d['fileName']} ({d.get('batch_name', 'Unknown')})" for d in datasets}
-        
-        selected_ids = st.multiselect(
-            "Select Files",
-            options=list(file_options.keys()),
-            format_func=lambda x: file_options[x],
-            key="batch_action_files",
-            placeholder="Choose files..."
-        )
-        
-        if selected_ids:
-            st.markdown("---")
-            # Move Action
-            st.caption("Move Selected")
+    # --- Batch Actions Button ---
+    if dialog_decorator:
+        if st.sidebar.button("⚡ Batch Actions", use_container_width=True):
+            manage_batch_dialog(datasets, batches)
+    else:
+        # Fallback for older versions: Expander
+        with st.sidebar.expander("⚡ Batch Actions", expanded=False):
+            # 1. Select Files
+            # Create a mapping of ID -> Display Name
+            file_options = {d['id']: f"{d['fileName']} ({d.get('batch_name', 'Unknown')})" for d in datasets}
             
-            # Target options (All folders)
-            target_options = {bid: info['name'] for bid, info in batches.items()}
-            # Ensure "File by file" is available
-            if 0 not in target_options:
-                 target_options[0] = "📄 File by file import"
-                 
-            c_dest, c_go = st.columns([0.7, 0.3], vertical_alignment="bottom")
-            with c_dest:
-                target_bid = st.selectbox(
-                    "Target Folder", 
-                    options=list(target_options.keys()), 
-                    format_func=lambda x: target_options[x], 
-                    key="batch_move_target",
-                    label_visibility="collapsed"
-                )
-            with c_go:
-                target_name = target_options[target_bid]
-                st.button(
-                    "Move", 
-                    key="batch_move_btn", 
-                    use_container_width=True, 
-                    on_click=move_files_batch_callback, 
-                    args=(selected_ids, target_bid, target_name)
-                )
+            selected_ids = st.multiselect(
+                "Select Files",
+                options=list(file_options.keys()),
+                format_func=lambda x: file_options[x],
+                key="batch_action_files",
+                placeholder="Choose files..."
+            )
+            
+            if selected_ids:
+                st.markdown("---")
+                # Move Action
+                st.caption("Move Selected")
                 
-            st.markdown("---")
-            # Delete Action
-            if st.button(f"Delete {len(selected_ids)} Files", key="batch_delete_btn", type="primary", use_container_width=True, on_click=delete_files_batch_callback, args=(selected_ids,)):
-                pass # Callback handles it
-        else:
-            st.caption("Select files to see actions.")
+                # Target options (All folders)
+                target_options = {bid: info['name'] for bid, info in batches.items()}
+                # Ensure "File by file" is available
+                if 0 not in target_options:
+                     target_options[0] = "📄 File by file import"
+                     
+                c_dest, c_go = st.columns([0.7, 0.3], vertical_alignment="bottom")
+                with c_dest:
+                    target_bid = st.selectbox(
+                        "Target Folder", 
+                        options=list(target_options.keys()), 
+                        format_func=lambda x: target_options[x], 
+                        key="batch_move_target",
+                        label_visibility="collapsed"
+                    )
+                with c_go:
+                    target_name = target_options[target_bid]
+                    st.button(
+                        "Move", 
+                        key="batch_move_btn", 
+                        use_container_width=True, 
+                        on_click=move_files_batch_callback, 
+                        args=(selected_ids, target_bid, target_name)
+                    )
+                    
+                st.markdown("---")
+                # Delete Action
+                if st.button(f"Delete {len(selected_ids)} Files", key="batch_delete_btn", type="primary", use_container_width=True, on_click=delete_files_batch_callback, args=(selected_ids,)):
+                    pass # Callback handles it
+            else:
+                st.caption("Select files to see actions.")
 
     # Display "File by file" first if it exists
     if 0 in batches:
@@ -751,9 +805,9 @@ if datasets or batches:
     
     st.sidebar.markdown("---")
     st.sidebar.markdown("""
-**Author:** Amir MEDDAS  
-*C2N - Centre de Nanosciences et de Nanotechnologies*  
-*LPS - Laboratoire de Physique des Solides*  
+**Author :** Amir MEDDAS  
+**LPS - Laboratoire de Physique des Solides*
+*C2N - Centre de Nanosciences et de Nanotechnologies*    
 [![LinkedIn](https://img.shields.io/badge/LinkedIn-0077B5?style=for-the-badge&logo=linkedin&logoColor=white)](https://www.linkedin.com/in/amir-meddas-80876424b/)
 """)
 
