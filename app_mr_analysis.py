@@ -1010,7 +1010,7 @@ def create_plot_interface(plot_id: str, available_datasets: List[Dict[str, Any]]
     with st.container(border=True):
         # Header with Actions - Flattened Layout for Robustness
         # Adjusted ratio (2:1) to give buttons more relative width in narrow containers (3 cols + sidebar).
-        c_title, c_ren, c_add, c_rem, c_dup = st.columns([2, 1, 1, 1, 1], vertical_alignment="center", gap="small")
+        c_title, c_ren, c_add, c_rem, c_dup = st.columns([1.7, 1, 1, 1, 1], vertical_alignment="center", gap="small")
         
         with c_title:
             # Plot Name or Edit Input
@@ -1137,7 +1137,7 @@ def create_plot_interface(plot_id: str, available_datasets: List[Dict[str, Any]]
             # R0 Method
             r0_method = persistent_selectbox(
                 "R0 Calculation Method",
-                ["Closest to 0T", "Mean within Window", "First Point"],
+                ["Closest to 0T", "Mean within Window", "First Point", "Max Resistance"],
                 index=0,
                 persistent_key=f"r0_meth_{plot_id}"
             )
@@ -1217,6 +1217,7 @@ def create_plot_interface(plot_id: str, available_datasets: List[Dict[str, Any]]
         with c5:
             # Common Toggles
             show_linear_fit = persistent_input(st.toggle, f"fit_{plot_id}", label="Show Linear Fit", value=False, help="Fit Y = aX + b")
+            show_parabolic_fit = persistent_input(st.toggle, f"pfit_{plot_id}", label="Show Parabolic Fit", value=False, help="Fit Y = aX² + bX + c")
             
             if analysis_mode == "Standard MR Analysis":
                 symmetrize = persistent_input(st.toggle, f"sym_{plot_id}", label="Symmetrize Data", value=False, help="R(H) = (R(H) + R(-H))/2")
@@ -1231,16 +1232,29 @@ def create_plot_interface(plot_id: str, available_datasets: List[Dict[str, Any]]
         # Fit Settings (Conditional)
         fit_range_min = None
         fit_range_max = None
+        pfit_range_min = None
+        pfit_range_max = None
         
-        if show_linear_fit:
+        if show_linear_fit or show_parabolic_fit:
             with st.popover("📏 Fit Settings", width='stretch'):
-                st.markdown("**Linear Fit Range (X-Axis)**")
-                c_fmin, c_fmax = st.columns(2)
-                with c_fmin:
-                    fit_range_min = persistent_input(st.number_input, f"fmin_{plot_id}", label="Min X", value=None, placeholder="Start")
-                with c_fmax:
-                    fit_range_max = persistent_input(st.number_input, f"fmax_{plot_id}", label="Max X", value=None, placeholder="End")
-                st.caption("Leave empty to fit the entire range.")
+                if show_linear_fit:
+                    st.markdown("**Linear Fit Range (X-Axis)**")
+                    c_fmin, c_fmax = st.columns(2)
+                    with c_fmin:
+                        fit_range_min = persistent_input(st.number_input, f"fmin_{plot_id}", label="Min X (Linear)", value=None, placeholder="Start")
+                    with c_fmax:
+                        fit_range_max = persistent_input(st.number_input, f"fmax_{plot_id}", label="Max X (Linear)", value=None, placeholder="End")
+                    st.caption("Leave empty to fit the entire range.")
+                
+                if show_parabolic_fit:
+                    if show_linear_fit: st.markdown("---")
+                    st.markdown("**Parabolic Fit Range (X-Axis)**")
+                    c_pmin, c_pmax = st.columns(2)
+                    with c_pmin:
+                        pfit_range_min = persistent_input(st.number_input, f"pfmin_{plot_id}", label="Min X (Parabolic)", value=None, placeholder="Start")
+                    with c_pmax:
+                        pfit_range_max = persistent_input(st.number_input, f"pfmax_{plot_id}", label="Max X (Parabolic)", value=None, placeholder="End")
+                    st.caption("Leave empty to fit the entire range.")
 
         if not selected_datasets:
             st.info("Select at least one file to display the plot.")
@@ -1378,6 +1392,8 @@ def create_plot_interface(plot_id: str, available_datasets: List[Dict[str, Any]]
                     else:
                         idx = df["H_T"].abs().idxmin()
                         r0 = df["R"].iloc[idx]
+                elif r0_method == "Max Resistance":
+                    r0 = df["R"].max()
 
                 # Calculate X
                 x_data = df["H_T"]
@@ -1577,6 +1593,57 @@ def create_plot_interface(plot_id: str, available_datasets: List[Dict[str, Any]]
                         bordercolor="black",
                         borderwidth=1,
                         font=dict(size=14, color="black")
+                    )
+
+            # Parabolic Fit
+            if show_parabolic_fit and x_data is not None and y_data is not None:
+                # Remove NaNs for fitting
+                mask_pfit = x_data.notna() & y_data.notna()
+                
+                # Apply Range Filter
+                if pfit_range_min is not None:
+                    mask_pfit &= (x_data >= pfit_range_min)
+                if pfit_range_max is not None:
+                    mask_pfit &= (x_data <= pfit_range_max)
+                
+                xpf = x_data[mask_pfit]
+                ypf = y_data[mask_pfit]
+                
+                if len(xpf) > 2: # Need at least 3 points for parabola
+                    # Polyfit degree 2
+                    a, b, c = np.polyfit(xpf, ypf, 2)
+                    y_pfit = a * xpf**2 + b * xpf + c
+                    
+                    # Plot the fit line only within the range
+                    fig.add_trace(go.Scatter(
+                        x=xpf,
+                        y=y_pfit,
+                        mode='lines',
+                        name=f"ParaFit {legend_name}",
+                        line=dict(dash='dot', width=2, color='blue'),
+                        hoverinfo='skip'
+                    ))
+                    
+                    # Enhanced Annotation
+                    eq_text = f"<b>y = {a:.2e} x² + {b:.2e} x + {c:.2e}</b>"
+                    
+                    # Position annotation near the center of the fit segment
+                    mid_idx = len(xpf) // 2
+                    
+                    fig.add_annotation(
+                        x=xpf.iloc[mid_idx],
+                        y=y_pfit.iloc[mid_idx],
+                        text=eq_text,
+                        showarrow=True,
+                        arrowhead=2,
+                        arrowsize=1,
+                        arrowwidth=2,
+                        ax=0,
+                        ay=40, # Offset downwards
+                        bgcolor="rgba(255, 255, 255, 0.8)",
+                        bordercolor="blue",
+                        borderwidth=1,
+                        font=dict(size=14, color="blue")
                     )
 
             # Add to export
