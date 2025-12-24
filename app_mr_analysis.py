@@ -565,16 +565,21 @@ if uploaded_files:
     
     new_files_count = 0
     updated_files_count = 0
+    skipped_count = 0
     
     for uploaded_file in uploaded_files:
-        existing_file = next((d for d in st.session_state.all_datasets if d['fileName'] == uploaded_file.name), None)
+        # Use basename to ensure we match against the stored filename correctly
+        fname = os.path.basename(uploaded_file.name)
+        
+        existing_file = next((d for d in st.session_state.all_datasets if d['fileName'] == fname), None)
         
         if existing_file and duplicate_strategy == "Skip":
+            skipped_count += 1
             continue
             
         try:
             content = uploaded_file.getvalue().decode("utf-8", errors="ignore")
-            data = parse_multivu_content(content, uploaded_file.name)
+            data = parse_multivu_content(content, fname)
             
             data['batch_id'] = batch_id
             data['batch_name'] = batch_name 
@@ -590,13 +595,17 @@ if uploaded_files:
                 st.session_state.all_datasets.append(data)
                 new_files_count += 1
         except Exception as e:
-            st.error(f"Error parsing {uploaded_file.name}: {e}")
+            st.error(f"Error parsing {fname}: {e}")
     
-    if new_files_count > 0 or updated_files_count > 0:
-        save_session_state()
+    if new_files_count > 0 or updated_files_count > 0 or skipped_count > 0:
+        if new_files_count > 0 or updated_files_count > 0:
+            save_session_state()
+            
         msg = []
         if new_files_count > 0: msg.append(f"{new_files_count} added")
         if updated_files_count > 0: msg.append(f"{updated_files_count} updated")
+        if skipped_count > 0: msg.append(f"{skipped_count} skipped")
+        
         st.sidebar.success(f"Done: {', '.join(msg)}.")
         st.session_state.uploader_key += 1
         st.rerun()
@@ -990,35 +999,37 @@ if datasets or batches:
             else:
                 st.caption("Select files to see actions.")
 
-    # Display "File by file" first if it exists
-    if 0 in batches:
-        with st.sidebar.expander(batches[0]['name'], expanded=False):
-            for d in batches[0]['files']:
-                c_name, c_act = st.columns([0.85, 0.15])
-                with c_name:
-                    st.text(f"📄 {d['fileName']}")
-                with c_act:
-                    render_file_actions(d, 0, batches)
-    
-    # Display other batches
-    for bid in batch_order:
-        if bid == 0: continue
+    # Scrollable Container for Files
+    with st.sidebar.container(height=500):
+        # Display "File by file" first if it exists
+        if 0 in batches:
+            with st.expander(batches[0]['name'], expanded=False):
+                for d in batches[0]['files']:
+                    c_name, c_act = st.columns([0.85, 0.15])
+                    with c_name:
+                        st.text(f"📄 {d['fileName']}")
+                    with c_act:
+                        render_file_actions(d, 0, batches)
         
-        b_name = batches[bid]['name']
-        with st.sidebar.expander(b_name, expanded=False):
-            # Rename Feature
-            col_ren, col_del = st.columns([0.85, 0.15])
-            with col_ren:
-                st.text_input("Folder Name", value=b_name, key=f"rename_{bid}", label_visibility="collapsed", on_change=rename_batch_callback, args=(bid, b_name))
-            with col_del:
-                st.button("🗑️", key=f"del_batch_{bid}", help="Delete Folder", on_click=delete_batch_callback, args=(bid,))
+        # Display other batches
+        for bid in batch_order:
+            if bid == 0: continue
             
-            for d in batches[bid]['files']:
-                c_name, c_act = st.columns([0.85, 0.15])
-                with c_name:
-                    st.text(f"📄 {d['fileName']}")
-                with c_act:
-                    render_file_actions(d, bid, batches)
+            b_name = batches[bid]['name']
+            with st.expander(b_name, expanded=False):
+                # Rename Feature
+                col_ren, col_del = st.columns([0.85, 0.15])
+                with col_ren:
+                    st.text_input("Folder Name", value=b_name, key=f"rename_{bid}", label_visibility="collapsed", on_change=rename_batch_callback, args=(bid, b_name))
+                with col_del:
+                    st.button("🗑️", key=f"del_batch_{bid}", help="Delete Folder", on_click=delete_batch_callback, args=(bid,))
+                
+                for d in batches[bid]['files']:
+                    c_name, c_act = st.columns([0.85, 0.15])
+                    with c_name:
+                        st.text(f"📄 {d['fileName']}")
+                    with c_act:
+                        render_file_actions(d, bid, batches)
     
     st.sidebar.caption("⚠️ Refreshing the page will clear the data.")
     
