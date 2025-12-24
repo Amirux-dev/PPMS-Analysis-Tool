@@ -1009,7 +1009,7 @@ def create_plot_interface(plot_id: str, available_datasets: List[Dict[str, Any]]
     
     with st.container(border=True):
         # Header with Actions
-        c_head_title, c_head_actions = st.columns([0.65, 0.35], vertical_alignment="center")
+        c_head_title, c_head_actions = st.columns([0.75, 0.25], vertical_alignment="center")
         
         with c_head_title:
             # Plot Name or Edit Input
@@ -1021,15 +1021,15 @@ def create_plot_interface(plot_id: str, available_datasets: List[Dict[str, Any]]
         
         with c_head_actions:
             # Action Buttons
-            b_ren, b_add, b_rem, b_dup = st.columns(4)
+            b_ren, b_add, b_rem, b_dup = st.columns(4, gap="small")
             with b_ren:
-                st.button("✏️", key=f"ren_btn_{plot_id}", help="Rename Plot", on_click=toggle_rename_callback, args=(plot_id,), use_container_width=True)
+                st.button("✏️", key=f"ren_btn_{plot_id}", help="Rename Plot", on_click=toggle_rename_callback, args=(plot_id,))
             with b_add:
-                st.button("➕", key=f"add_btn_{plot_id}", help="Add a new plot", on_click=add_plot_callback, use_container_width=True)
+                st.button("➕", key=f"add_btn_{plot_id}", help="Add a new plot", on_click=add_plot_callback)
             with b_rem:
-                st.button("➖", key=f"del_btn_{plot_id}", help="Remove this plot", on_click=remove_plot_callback, args=(plot_id,), use_container_width=True)
+                st.button("➖", key=f"del_btn_{plot_id}", help="Remove this plot", on_click=remove_plot_callback, args=(plot_id,))
             with b_dup:
-                st.button("📋", key=f"dup_{plot_id}", help="Duplicate this plot", on_click=duplicate_plot_callback, args=(plot_id,), use_container_width=True)
+                st.button("📋", key=f"dup_{plot_id}", help="Duplicate this plot", on_click=duplicate_plot_callback, args=(plot_id,))
         
         # Row 0: Analysis Mode
         analysis_mode = persistent_selectbox(
