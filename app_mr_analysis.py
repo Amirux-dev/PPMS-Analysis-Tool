@@ -361,6 +361,34 @@ def persistent_selectbox(label, options, persistent_key, **kwargs):
     
     return selected_val
 
+def persistent_input(widget_func, persistent_key, **kwargs):
+    """
+    Wrapper for value-based widgets (toggle, text, number, checkbox, color).
+    Persists value in st.session_state['persistent_values'].
+    Rotates key with uploader_key to force re-render with stored value.
+    """
+    if 'persistent_values' not in st.session_state:
+        st.session_state['persistent_values'] = {}
+    store = st.session_state['persistent_values']
+    
+    uploader_key = st.session_state.get('uploader_key', 0)
+    widget_key = f"{persistent_key}_{uploader_key}"
+    
+    # 1. Check for interaction on CURRENT widget
+    if widget_key in st.session_state:
+        store[persistent_key] = st.session_state[widget_key]
+        
+    # 2. Get value to display (Store > Default)
+    if persistent_key in store:
+        kwargs['value'] = store[persistent_key]
+        
+    # 3. Render
+    val = widget_func(key=widget_key, **kwargs)
+    
+    # 4. Sync
+    store[persistent_key] = val
+    return val
+
 def init_session_state():
     """Initialize all session state variables."""
     defaults = {
@@ -1155,20 +1183,20 @@ def create_plot_interface(plot_id: str, available_datasets: List[Dict[str, Any]]
         # Row 2: Processing
         c4, c5 = st.columns([1, 1], vertical_alignment="bottom")
         with c4:
-            smooth_window = st.number_input("Smoothing (pts)", min_value=0, value=0, step=1, key=f"smooth_{plot_id}", help="Moving average window size.")
+            smooth_window = persistent_input(st.number_input, f"smooth_{plot_id}", label="Smoothing (pts)", min_value=0, value=0, step=1, help="Moving average window size.")
         with c5:
             # Common Toggles
-            show_linear_fit = st.toggle("Show Linear Fit", value=False, key=f"fit_{plot_id}", help="Fit Y = aX + b")
+            show_linear_fit = persistent_input(st.toggle, f"fit_{plot_id}", label="Show Linear Fit", value=False, help="Fit Y = aX + b")
             
             if analysis_mode == "Standard MR Analysis":
-                symmetrize = st.toggle("Symmetrize Data", value=False, key=f"sym_{plot_id}", help="R(H) = (R(H) + R(-H))/2")
+                symmetrize = persistent_input(st.toggle, f"sym_{plot_id}", label="Symmetrize Data", value=False, help="R(H) = (R(H) + R(-H))/2")
                 plot_derivative = False
             elif analysis_mode == "Standard R-T Analysis":
                 symmetrize = False
                 plot_derivative = False
             else:
                 symmetrize = False
-                plot_derivative = st.toggle("Plot Derivative (dY/dX)", value=False, key=f"deriv_{plot_id}", help="Plot dY/dX vs X")
+                plot_derivative = persistent_input(st.toggle, f"deriv_{plot_id}", label="Plot Derivative (dY/dX)", value=False, help="Plot dY/dX vs X")
 
         # Fit Settings (Conditional)
         fit_range_min = None
@@ -1179,9 +1207,9 @@ def create_plot_interface(plot_id: str, available_datasets: List[Dict[str, Any]]
                 st.markdown("**Linear Fit Range (X-Axis)**")
                 c_fmin, c_fmax = st.columns(2)
                 with c_fmin:
-                    fit_range_min = st.number_input("Min X", value=None, placeholder="Start", key=f"fmin_{plot_id}")
+                    fit_range_min = persistent_input(st.number_input, f"fmin_{plot_id}", label="Min X", value=None, placeholder="Start")
                 with c_fmax:
-                    fit_range_max = st.number_input("Max X", value=None, placeholder="End", key=f"fmax_{plot_id}")
+                    fit_range_max = persistent_input(st.number_input, f"fmax_{plot_id}", label="Max X", value=None, placeholder="End")
                 st.caption("Leave empty to fit the entire range.")
 
         if not selected_datasets:
@@ -1193,7 +1221,7 @@ def create_plot_interface(plot_id: str, available_datasets: List[Dict[str, Any]]
         with st.popover("🖊️ Legend Labels", width='stretch'):
             for d in selected_datasets:
                 default_leg = d['label']
-                custom_leg = st.text_input(f"Label for {d['fileName']}", value=default_leg, key=f"leg_{plot_id}_{d['id']}")
+                custom_leg = persistent_input(st.text_input, f"leg_{plot_id}_{d['id']}", label=f"Label for {d['fileName']}", value=default_leg)
                 custom_legends[d['id']] = custom_leg
 
         # --- Customization ---
@@ -1201,25 +1229,30 @@ def create_plot_interface(plot_id: str, available_datasets: List[Dict[str, Any]]
             # Row 1: Titles & Theme
             col_cust1, col_cust2, col_cust3 = st.columns(3)
             with col_cust1:
-                custom_title = st.text_input("Plot Title", value="", placeholder="Auto-generated if empty", key=f"title_{plot_id}")
-                title_font_size = st.number_input("Title Font Size", value=20, min_value=10, max_value=50, key=f"title_font_{plot_id}")
+                custom_title = persistent_input(st.text_input, f"title_{plot_id}", label="Plot Title", value="", placeholder="Auto-generated if empty")
+                title_font_size = persistent_input(st.number_input, f"title_font_{plot_id}", label="Title Font Size", value=20, min_value=10, max_value=50)
             with col_cust2:
-                template_mode = st.selectbox("Theme", ["Auto (Global)", "plotly_white", "plotly", "plotly_dark", "ggplot2", "seaborn", "simple_white", "none"], index=0, key=f"theme_{plot_id}")
-                show_legend = st.checkbox("Show Legend", value=True, key=f"legend_{plot_id}")
+                template_mode = persistent_selectbox(
+                    "Theme", 
+                    ["Auto (Global)", "plotly_white", "plotly", "plotly_dark", "ggplot2", "seaborn", "simple_white", "none"], 
+                    index=0, 
+                    persistent_key=f"theme_{plot_id}"
+                )
+                show_legend = persistent_input(st.checkbox, f"legend_{plot_id}", label="Show Legend", value=True)
             with col_cust3:
-                plot_mode = st.selectbox(
+                plot_mode = persistent_selectbox(
                     "Plot Style", 
                     ["Lines", "Markers", "Lines+Markers"], 
                     index=0,
-                    key=f"style_{plot_id}"
+                    persistent_key=f"style_{plot_id}"
                 )
                 if "Lines" in plot_mode:
-                    line_width = st.number_input("Line Width", value=2.0, min_value=0.5, max_value=10.0, step=0.5, key=f"lw_{plot_id}")
+                    line_width = persistent_input(st.number_input, f"lw_{plot_id}", label="Line Width", value=2.0, min_value=0.5, max_value=10.0, step=0.5)
                 else:
                     line_width = 2.0
                 
                 if "Markers" in plot_mode:
-                    marker_size = st.number_input("Marker Size", value=6, min_value=1, max_value=20, step=1, key=f"ms_{plot_id}")
+                    marker_size = persistent_input(st.number_input, f"ms_{plot_id}", label="Marker Size", value=6, min_value=1, max_value=20, step=1)
                 else:
                     marker_size = 6
 
@@ -1228,38 +1261,38 @@ def create_plot_interface(plot_id: str, available_datasets: List[Dict[str, Any]]
             # Row 2: Axes
             col_cust4, col_cust5, col_cust6 = st.columns(3)
             with col_cust4:
-                custom_xlabel = st.text_input("X-Axis Label", value="", placeholder="Auto-generated if empty", key=f"xlabel_{plot_id}")
-                axis_title_size = st.number_input("Axis Title Size", value=16, min_value=8, max_value=40, key=f"axis_title_font_{plot_id}")
+                custom_xlabel = persistent_input(st.text_input, f"xlabel_{plot_id}", label="X-Axis Label", value="", placeholder="Auto-generated if empty")
+                axis_title_size = persistent_input(st.number_input, f"axis_title_font_{plot_id}", label="Axis Title Size", value=16, min_value=8, max_value=40)
                 
                 # X Limits
-                use_xlim = st.checkbox("Set X Limits", key=f"use_xlim_{plot_id}")
+                use_xlim = persistent_input(st.checkbox, f"use_xlim_{plot_id}", label="Set X Limits")
                 if use_xlim:
                     c_xmin, c_xmax = st.columns(2)
                     with c_xmin:
-                        xlim_min = st.number_input("Min", value=-9.0, format="%.2f", key=f"xlim_min_{plot_id}")
+                        xlim_min = persistent_input(st.number_input, f"xlim_min_{plot_id}", label="Min", value=-9.0, format="%.2f")
                     with c_xmax:
-                        xlim_max = st.number_input("Max", value=9.0, format="%.2f", key=f"xlim_max_{plot_id}")
+                        xlim_max = persistent_input(st.number_input, f"xlim_max_{plot_id}", label="Max", value=9.0, format="%.2f")
                 else:
                     xlim_min, xlim_max = None, None
 
             with col_cust5:
-                custom_ylabel = st.text_input("Y-Axis Label", value="", placeholder="Auto-generated if empty", key=f"ylabel_{plot_id}")
-                tick_font_size = st.number_input("Tick Label Size", value=14, min_value=8, max_value=30, key=f"tick_font_{plot_id}")
+                custom_ylabel = persistent_input(st.text_input, f"ylabel_{plot_id}", label="Y-Axis Label", value="", placeholder="Auto-generated if empty")
+                tick_font_size = persistent_input(st.number_input, f"tick_font_{plot_id}", label="Tick Label Size", value=14, min_value=8, max_value=30)
                 
                 # Y Limits
-                use_ylim = st.checkbox("Set Y Limits", key=f"use_ylim_{plot_id}")
+                use_ylim = persistent_input(st.checkbox, f"use_ylim_{plot_id}", label="Set Y Limits")
                 if use_ylim:
                     c_ymin, c_ymax = st.columns(2)
                     with c_ymin:
-                        ylim_min = st.number_input("Min", value=0.0, format="%.2e", key=f"ylim_min_{plot_id}")
+                        ylim_min = persistent_input(st.number_input, f"ylim_min_{plot_id}", label="Min", value=0.0, format="%.2e")
                     with c_ymax:
-                        ylim_max = st.number_input("Max", value=100.0, format="%.2e", key=f"ylim_max_{plot_id}")
+                        ylim_max = persistent_input(st.number_input, f"ylim_max_{plot_id}", label="Max", value=100.0, format="%.2e")
                 else:
                     ylim_min, ylim_max = None, None
 
             with col_cust6:
-                show_grid = st.checkbox("Show Grid", value=True, key=f"grid_{plot_id}")
-                grid_color = st.color_picker("Grid Color", value="#E5E5E5", key=f"grid_color_{plot_id}")
+                show_grid = persistent_input(st.checkbox, f"grid_{plot_id}", label="Show Grid", value=True)
+                grid_color = persistent_input(st.color_picker, f"grid_color_{plot_id}", label="Grid Color", value="#E5E5E5")
 
         fig = go.Figure()
         
