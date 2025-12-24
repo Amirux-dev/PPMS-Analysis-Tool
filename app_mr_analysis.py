@@ -427,8 +427,9 @@ def delete_file_callback(file_id):
                 # This is a multiselect key, value is a list of filenames
                 current_selection = st.session_state[key]
                 if isinstance(current_selection, list) and file_to_delete in current_selection:
-                    current_selection.remove(file_to_delete)
-                    st.session_state[key] = current_selection
+                    # Create a new list to ensure state update is detected
+                    new_selection = [f for f in current_selection if f != file_to_delete]
+                    st.session_state[key] = new_selection
 
 def delete_batch_callback(batch_id):
     # Delete files in the batch
@@ -705,7 +706,20 @@ def create_plot_interface(plot_id: str, available_datasets: List[Dict[str, Any]]
         # --- Unified File Selection (Moved to Top) ---
         # Filter by Folder (Batch)
         batch_options = get_batch_options(available_datasets, st.session_state.get('custom_batches', {}))
-        selected_batch_name = st.selectbox("Filter by Folder", batch_options, index=0, key=f"batch_filter_{plot_id}")
+        
+        # Robust Index Calculation: Preserve selection even if options change
+        current_batch_val = st.session_state.get(f"batch_filter_{plot_id}", "All Folders")
+        try:
+            batch_index = batch_options.index(current_batch_val)
+        except ValueError:
+            batch_index = 0
+            
+        selected_batch_name = st.selectbox(
+            "Filter by Folder", 
+            batch_options, 
+            index=batch_index, 
+            key=f"batch_filter_{plot_id}"
+        )
         
         if selected_batch_name != "All Folders":
             filtered_datasets = [d for d in available_datasets if d.get('batch_name') == selected_batch_name]
@@ -724,6 +738,7 @@ def create_plot_interface(plot_id: str, available_datasets: List[Dict[str, Any]]
         selected_filenames = st.multiselect(
             f"Select Curves for Plot {plot_id}", 
             options=combined_options,
+            default=None, # Rely on session state key
             key=f"sel_{plot_id}"
         )
         
