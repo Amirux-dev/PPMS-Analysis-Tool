@@ -254,16 +254,20 @@ st.set_page_config(page_title="PPMS Analysis Tool", layout="wide")
 st.title("📊 PPMS Analysis Tool")
 st.markdown("Upload `.dat` files to analyze MR, Resistance, and Normalization.")
 
-# --- Sidebar: Configuration ---
-st.sidebar.header("Configuration")
+# --- Sidebar: Data Manager ---
+st.sidebar.header("📂 Data Manager")
 
 # Initialize Session State for Data
 if 'all_datasets' not in st.session_state:
     st.session_state.all_datasets = []
 
-# File Selection
-st.sidebar.subheader("Data Source")
-uploaded_files = st.sidebar.file_uploader("Upload .dat files", type=["dat"], accept_multiple_files=True)
+# File Uploader
+uploaded_files = st.sidebar.file_uploader(
+    "Upload .dat files or folders", 
+    type=["dat"], 
+    accept_multiple_files=True,
+    help="Drag and drop files or folders here. They will be added to your session."
+)
 
 # Process Uploaded Files
 if uploaded_files:
@@ -284,49 +288,52 @@ if uploaded_files:
     if new_files_count > 0:
         st.sidebar.success(f"Added {new_files_count} new files.")
 
-# Clear Data Button
-if st.sidebar.button("Clear All Data"):
-    st.session_state.all_datasets = []
-    st.rerun()
-
-# Data Explorer / Filter
+# Data Management & Explorer
 datasets = st.session_state.all_datasets
 
-# Sort datasets
-datasets.sort(key=lambda d: (d['temperatureK'] if d['temperatureK'] is not None else 9999, d['fileName']))
+if datasets:
+    # Sort datasets
+    datasets.sort(key=lambda d: (d['temperatureK'] if d['temperatureK'] is not None else 9999, d['fileName']))
 
-# Ensure unique labels
-label_counts = {}
-for d in datasets:
-    l = d['label']
-    label_counts[l] = label_counts.get(l, 0) + 1
+    # Ensure unique labels
+    label_counts = {}
+    for d in datasets:
+        l = d['label']
+        label_counts[l] = label_counts.get(l, 0) + 1
 
-for d in datasets:
-    l = d['label']
-    if label_counts[l] > 1:
-        d['label'] = f"{l} ({d['fileName']})"
+    for d in datasets:
+        l = d['label']
+        if label_counts[l] > 1:
+            d['label'] = f"{l} ({d['fileName']})"
+    
+    # Explorer UI
+    st.sidebar.markdown("---")
+    c_info, c_clear = st.sidebar.columns([2, 1], vertical_alignment="center")
+    with c_info:
+        st.write(f"**Total Files:** {len(datasets)}")
+    with c_clear:
+        if st.button("🗑️ Clear", help="Remove all loaded data"):
+            st.session_state.all_datasets = []
+            st.rerun()
 
-if not datasets:
-    st.info("Please upload files to begin.")
+    # Group by Sample (First word of label)
+    files_by_sample = {}
+    for d in datasets:
+        sample = d['label'].split()[0]
+        if sample not in files_by_sample:
+            files_by_sample[sample] = []
+        files_by_sample[sample].append(d)
+
+    for sample, sample_datasets in files_by_sample.items():
+        with st.sidebar.expander(f"📁 {sample} ({len(sample_datasets)})"):
+            for d in sample_datasets:
+                st.text(f"📄 {d['fileName']}")
+    
+    st.sidebar.caption("⚠️ Refreshing the page will clear the data.")
+
+else:
+    st.sidebar.info("No data loaded. Upload files to begin.")
     st.stop()
-
-# Sidebar Data Explorer
-st.sidebar.subheader("📂 Data Explorer")
-st.sidebar.write(f"Total Files: {len(datasets)}")
-
-# Group by Sample (First word of label)
-files_by_sample = {}
-for d in datasets:
-    # Extract sample name from label (first word)
-    sample = d['label'].split()[0]
-    if sample not in files_by_sample:
-        files_by_sample[sample] = []
-    files_by_sample[sample].append(d)
-
-for sample, sample_datasets in files_by_sample.items():
-    with st.sidebar.expander(f"📁 {sample} ({len(sample_datasets)})"):
-        for d in sample_datasets:
-            st.text(f"📄 {d['fileName']}")
 
 # --- Sidebar: Footer ---
 st.sidebar.markdown("---")
