@@ -318,11 +318,11 @@ if 'plot_ids' not in st.session_state:
 if 'next_plot_id' not in st.session_state:
     st.session_state.next_plot_id = 2
 
-st.title("📊 PPMS Analysis Tool")
+st.title("PPMS Analysis Tool")
 st.markdown("Upload `.dat` files to visualize and analyze transport measurements (R-T, MR, I-V, etc.).")
 
 # --- Sidebar: Data Manager ---
-st.sidebar.header("📂 Data Manager")
+st.sidebar.header("Data Manager")
 
 # File Uploader (Automatic)
 uploaded_files = st.sidebar.file_uploader(
@@ -465,17 +465,22 @@ if datasets or batches:
                     st.text(f"📄 {d['fileName']}")
                 with c_act:
                     with st.popover("⋮", help="Manage File"):
+                        st.markdown("**Move File**")
                         # Move Action
                         all_batch_options = {bid: info['name'] for bid, info in batches.items() if bid != 0}
                         if all_batch_options:
-                            target_bid = st.selectbox("Move to", options=list(all_batch_options.keys()), format_func=lambda x: all_batch_options[x], key=f"mv_sel_{d['id']}")
-                            if st.button("Move", key=f"mv_btn_{d['id']}"):
-                                d['batch_id'] = target_bid
-                                d['batch_name'] = all_batch_options[target_bid]
-                                st.rerun()
+                            # Compact row for move
+                            c_dest, c_go = st.columns([0.7, 0.3], vertical_alignment="bottom")
+                            with c_dest:
+                                target_bid = st.selectbox("Target", options=list(all_batch_options.keys()), format_func=lambda x: all_batch_options[x], key=f"mv_sel_{d['id']}", label_visibility="collapsed")
+                            with c_go:
+                                if st.button("Move", key=f"mv_btn_{d['id']}", use_container_width=True):
+                                    d['batch_id'] = target_bid
+                                    d['batch_name'] = all_batch_options[target_bid]
+                                    st.rerun()
                         
-                        st.markdown("---")
-                        if st.button("Delete", key=f"rm_{d['id']}", type="primary"):
+                        st.divider()
+                        if st.button("Delete File", key=f"rm_{d['id']}", type="primary", use_container_width=True):
                             st.session_state.all_datasets.remove(d)
                             st.rerun()
     
@@ -514,23 +519,28 @@ if datasets or batches:
                     st.text(f"📄 {d['fileName']}")
                 with c_act:
                     with st.popover("⋮", help="Manage File"):
+                        st.markdown("**Move File**")
                         # Move Action
                         all_batch_options = {b: info['name'] for b, info in batches.items() if b != bid}
                         # Add File by File as option
                         all_batch_options[0] = "📄 File by file import"
                         
                         if all_batch_options:
-                            target_bid = st.selectbox("Move to", options=list(all_batch_options.keys()), format_func=lambda x: all_batch_options[x], key=f"mv_sel_{d['id']}")
-                            if st.button("Move", key=f"mv_btn_{d['id']}"):
-                                d['batch_id'] = target_bid
-                                if target_bid == 0:
-                                    d['batch_name'] = "📄 File by file import"
-                                else:
-                                    d['batch_name'] = batches[target_bid]['name']
-                                st.rerun()
+                            # Compact row for move
+                            c_dest, c_go = st.columns([0.7, 0.3], vertical_alignment="bottom")
+                            with c_dest:
+                                target_bid = st.selectbox("Target", options=list(all_batch_options.keys()), format_func=lambda x: all_batch_options[x], key=f"mv_sel_{d['id']}", label_visibility="collapsed")
+                            with c_go:
+                                if st.button("Move", key=f"mv_btn_{d['id']}", use_container_width=True):
+                                    d['batch_id'] = target_bid
+                                    if target_bid == 0:
+                                        d['batch_name'] = "📄 File by file import"
+                                    else:
+                                        d['batch_name'] = batches[target_bid]['name']
+                                    st.rerun()
                         
-                        st.markdown("---")
-                        if st.button("Delete", key=f"rm_{d['id']}", type="primary"):
+                        st.divider()
+                        if st.button("Delete File", key=f"rm_{d['id']}", type="primary", use_container_width=True):
                             st.session_state.all_datasets.remove(d)
                             st.rerun()
     
@@ -602,13 +612,13 @@ def create_plot_interface(plot_id: str, available_datasets: List[Dict[str, Any]]
         
         with c_head_title:
             # Editable Plot Name (Styled as Header)
-            c_h_text, c_h_edit = st.columns([0.9, 0.1], vertical_alignment="center")
+            c_h_text, c_h_edit = st.columns([0.8, 0.2], vertical_alignment="center")
             with c_h_text:
                 plot_name = st.session_state.get(f"pname_{plot_id}", f"Plot {plot_id}")
                 # Use HTML to control margins and style
                 st.markdown(f"<h3 style='margin: 0; padding: 0; line-height: 1.5;'>{plot_name}</h3>", unsafe_allow_html=True)
             with c_h_edit:
-                with st.popover("✏️", help="Rename Plot"):
+                with st.popover("✏️", help="Rename Plot", use_container_width=True):
                     st.text_input("Name", value=plot_name, key=f"pname_{plot_id}")
         
         with c_head_actions:
