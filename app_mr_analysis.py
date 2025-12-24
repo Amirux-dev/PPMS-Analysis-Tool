@@ -20,20 +20,22 @@ st.markdown("""
 <style>
     /* Center Popover Buttons */
     div[data-testid="stPopover"] > button {
-        justify-content: center;
-        text-align: center;
         width: 100%;
+        justify-content: center !important;
     }
+
     /* Center Expander Headers */
-    div[data-testid="stExpander"] summary p {
-        text-align: center;
-        width: 100%;
-        font-size: 1rem;
-        font-weight: 600;
+    div[data-testid="stExpander"] details > summary {
+        justify-content: center !important;
     }
-    /* Adjust arrow position if needed (optional) */
-    div[data-testid="stExpander"] summary {
-        justify-content: center; 
+    
+    div[data-testid="stExpander"] details > summary > div {
+        flex: 0 1 auto !important;
+    }
+    
+    div[data-testid="stExpander"] details > summary p {
+        text-align: center !important;
+        margin-bottom: 0 !important;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -1399,6 +1401,15 @@ def create_plot_interface(plot_id: str, available_datasets: List[Dict[str, Any]]
         if template_mode == "Auto (Global)":
             final_template = "plotly" 
         
+        # Construct uirevision to preserve zoom/pan across reruns
+        uirevision_key = f"{plot_id}_{analysis_mode}"
+        if analysis_mode == "Standard MR Analysis":
+             uirevision_key += f"_{x_axis_unit}_{y_axis_mode}"
+        elif analysis_mode == "Standard R-T Analysis":
+             uirevision_key += f"_{y_axis_mode}"
+        else:
+             uirevision_key += f"_{custom_x_col}_{custom_y_col}"
+
         layout_args = dict(
             title=dict(
                 text=final_title,
@@ -1424,7 +1435,8 @@ def create_plot_interface(plot_id: str, available_datasets: List[Dict[str, Any]]
             hovermode="closest",
             height=height,
             width=width,
-            template=final_template
+            template=final_template,
+            uirevision=uirevision_key
         )
 
         fig.update_layout(**layout_args)
