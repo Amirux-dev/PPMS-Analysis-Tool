@@ -911,30 +911,52 @@ def create_plot_interface(plot_id: str, available_datasets: List[Dict[str, Any]]
                 return "All Folders"
             return batch_map.get(option, f"Batch {option}")
 
-        # Migration: Check if current value is a string (old name)
-        current_batch_key = f"batch_filter_{plot_id}"
-        current_val = st.session_state.get(current_batch_key)
+        # --- Unified File Selection ---
+        # Filter by Folder (Batch)
+        batch_map = get_batch_map(available_datasets, st.session_state.get('custom_batches', {}))
+        
+        # Options: "ALL" + sorted IDs
+        batch_ids = sorted(batch_map.keys())
+        options = ["ALL"] + batch_ids
+        
+        def format_batch(option):
+            if option == "ALL":
+                return "All Folders"
+            return batch_map.get(option, f"Batch {option}")
+
+        # Persistent State Key
+        persistent_batch_key = f"batch_filter_{plot_id}"
+        
+        # Migration/Validation Logic
+        current_val = st.session_state.get(persistent_batch_key)
         
         # If value is a string (old name) or invalid, try to migrate or reset
         if (isinstance(current_val, str) and current_val != "ALL" and current_val not in options) or (current_val not in options and current_val is not None):
-            # Try to find the ID for this name (Migration)
             found_id = "ALL"
             if isinstance(current_val, str):
                 for bid, bname in batch_map.items():
                     if bname == current_val:
                         found_id = bid
                         break
-            st.session_state[current_batch_key] = found_id
+            st.session_state[persistent_batch_key] = found_id
         
-        # Final Validation
-        if st.session_state.get(current_batch_key) not in options:
-             st.session_state[current_batch_key] = "ALL"
+        if st.session_state.get(persistent_batch_key) not in options:
+             st.session_state[persistent_batch_key] = "ALL"
+             
+        # Dynamic Widget Key (Rotates with Uploader Key to force re-render on new data)
+        # This prevents the widget from resetting to empty when options change significantly
+        widget_batch_key = f"batch_filter_{plot_id}_{st.session_state.uploader_key}"
         
+        # Sync Widget -> State
+        if widget_batch_key in st.session_state:
+            st.session_state[persistent_batch_key] = st.session_state[widget_batch_key]
+            
         selected_batch_id = st.selectbox(
             "Filter by Folder", 
             options, 
             format_func=format_batch,
-            key=current_batch_key
+            index=options.index(st.session_state[persistent_batch_key]),
+            key=widget_batch_key
         )
         
         if selected_batch_id != "ALL":
@@ -947,24 +969,32 @@ def create_plot_interface(plot_id: str, available_datasets: List[Dict[str, Any]]
         filtered_filenames = [d['fileName'] for d in filtered_datasets]
         
         # Validate and Fix File Selection in Session State
-        sel_key = f"sel_{plot_id}"
-        current_selection = st.session_state.get(sel_key, [])
+        persistent_sel_key = f"sel_{plot_id}"
+        current_selection = st.session_state.get(persistent_sel_key, [])
         
         # 1. Remove files that don't exist anymore globally
         all_existing_files = {d['fileName'] for d in available_datasets}
         valid_selection = [f for f in current_selection if f in all_existing_files]
         
         if len(valid_selection) != len(current_selection):
-            st.session_state[sel_key] = valid_selection
+            st.session_state[persistent_sel_key] = valid_selection
             current_selection = valid_selection
         
         # 2. Ensure options include the selection
         combined_options = sorted(list(set(filtered_filenames + current_selection)))
         
+        # Dynamic Widget Key for Multiselect
+        widget_sel_key = f"sel_{plot_id}_{st.session_state.uploader_key}"
+        
+        # Sync Widget -> State
+        if widget_sel_key in st.session_state:
+            st.session_state[persistent_sel_key] = st.session_state[widget_sel_key]
+        
         selected_filenames = st.multiselect(
             f"Select Curves for Plot {plot_id}", 
             options=combined_options,
-            key=sel_key
+            default=current_selection,
+            key=widget_sel_key
         )
         
         # Map back to datasets
