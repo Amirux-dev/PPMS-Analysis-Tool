@@ -19,6 +19,9 @@ st.set_page_config(layout="wide", page_title="PPMS Analysis Tool")
 # -----------------------------------------------------------------------------
 
 init_session_state()
+# Load previous state if available
+if not st.session_state.all_datasets:
+    load_session_state()
 recover_session_state()
 
 # Ensure Unique IDs for all datasets (Migration/Safety check)

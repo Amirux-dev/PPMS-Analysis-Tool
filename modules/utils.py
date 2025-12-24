@@ -7,7 +7,11 @@ import uuid
 # SESSION PERSISTENCE
 # -----------------------------------------------------------------------------
 
-STATE_FILE = "session_state.pkl"
+# Ensure the state file is stored in the application root directory
+# This prevents issues depending on where the streamlit command is run from
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+APP_ROOT = os.path.dirname(BASE_DIR)
+STATE_FILE = os.path.join(APP_ROOT, "session_state.pkl")
 
 def save_session_state():
     """Saves the current session state to a local pickle file."""
