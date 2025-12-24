@@ -402,6 +402,22 @@ with st.sidebar.popover("➕ Create New Folder", use_container_width=True):
         st.success(f"Created {new_folder_name}")
         st.rerun()
 
+# Callbacks for File Management
+def move_file_callback(file_id, target_bid, target_name):
+    for d in st.session_state.all_datasets:
+        if d['id'] == file_id:
+            d['batch_id'] = target_bid
+            d['batch_name'] = target_name
+            break
+
+def delete_file_callback(file_id):
+    st.session_state.all_datasets = [d for d in st.session_state.all_datasets if d['id'] != file_id]
+
+def delete_batch_callback(batch_id):
+    st.session_state.all_datasets = [d for d in st.session_state.all_datasets if d.get('batch_id') != batch_id]
+    if 'custom_batches' in st.session_state and batch_id in st.session_state.custom_batches:
+        del st.session_state.custom_batches[batch_id]
+
 # Data Management & Explorer
 datasets = st.session_state.all_datasets
 
@@ -474,15 +490,10 @@ if datasets or batches:
                             with c_dest:
                                 target_bid = st.selectbox("Target", options=list(all_batch_options.keys()), format_func=lambda x: all_batch_options[x], key=f"mv_sel_{d['id']}", label_visibility="collapsed")
                             with c_go:
-                                if st.button("Move", key=f"mv_btn_{d['id']}", use_container_width=True):
-                                    d['batch_id'] = target_bid
-                                    d['batch_name'] = all_batch_options[target_bid]
-                                    st.rerun()
+                                st.button("Move", key=f"mv_btn_{d['id']}", use_container_width=True, on_click=move_file_callback, args=(d['id'], target_bid, all_batch_options[target_bid]))
                         
-                        st.divider()
-                        if st.button("Delete File", key=f"rm_{d['id']}", type="primary", use_container_width=True):
-                            st.session_state.all_datasets.remove(d)
-                            st.rerun()
+                        st.markdown("<hr style='margin: 5px 0; border: none; border-top: 1px solid #f0f0f0;'>", unsafe_allow_html=True)
+                        st.button("Delete File", key=f"rm_{d['id']}", type="primary", use_container_width=True, on_click=delete_file_callback, args=(d['id'],))
     
     # Display other batches
     for bid in batch_order:
@@ -495,13 +506,7 @@ if datasets or batches:
             with col_ren:
                 new_name = st.text_input("Folder Name", value=b_name, key=f"rename_{bid}", label_visibility="collapsed")
             with col_del:
-                if st.button("🗑️", key=f"del_batch_{bid}", help="Delete Folder"):
-                    # Remove files in this batch
-                    st.session_state.all_datasets = [d for d in st.session_state.all_datasets if d.get('batch_id') != bid]
-                    # Remove custom batch entry
-                    if 'custom_batches' in st.session_state and bid in st.session_state.custom_batches:
-                        del st.session_state.custom_batches[bid]
-                    st.rerun()
+                st.button("🗑️", key=f"del_batch_{bid}", help="Delete Folder", on_click=delete_batch_callback, args=(bid,))
             
             if new_name != b_name:
                 # Update all files in this batch
@@ -531,18 +536,14 @@ if datasets or batches:
                             with c_dest:
                                 target_bid = st.selectbox("Target", options=list(all_batch_options.keys()), format_func=lambda x: all_batch_options[x], key=f"mv_sel_{d['id']}", label_visibility="collapsed")
                             with c_go:
-                                if st.button("Move", key=f"mv_btn_{d['id']}", use_container_width=True):
-                                    d['batch_id'] = target_bid
-                                    if target_bid == 0:
-                                        d['batch_name'] = "📄 File by file import"
-                                    else:
-                                        d['batch_name'] = batches[target_bid]['name']
-                                    st.rerun()
+                                if target_bid == 0:
+                                    t_name = "📄 File by file import"
+                                else:
+                                    t_name = batches[target_bid]['name']
+                                st.button("Move", key=f"mv_btn_{d['id']}", use_container_width=True, on_click=move_file_callback, args=(d['id'], target_bid, t_name))
                         
-                        st.divider()
-                        if st.button("Delete File", key=f"rm_{d['id']}", type="primary", use_container_width=True):
-                            st.session_state.all_datasets.remove(d)
-                            st.rerun()
+                        st.markdown("<hr style='margin: 5px 0; border: none; border-top: 1px solid #f0f0f0;'>", unsafe_allow_html=True)
+                        st.button("Delete File", key=f"rm_{d['id']}", type="primary", use_container_width=True, on_click=delete_file_callback, args=(d['id'],))
     
     st.sidebar.caption("⚠️ Refreshing the page will clear the data.")
     
@@ -1170,7 +1171,7 @@ def create_plot_interface(plot_id: str, available_datasets: List[Dict[str, Any]]
 with st.expander("Layout & Export Settings", expanded=True):
     col_lay1, col_lay2, col_lay3 = st.columns(3)
     with col_lay1:
-        num_cols = st.number_input("Columns per Row", min_value=1, max_value=3, value=2)
+        num_cols = st.number_input("Columns per Row", min_value=1, max_value=3, value=1)
     with col_lay2:
         plot_width = st.number_input("Plot Width (px)", min_value=300, value=600)
     with col_lay3:
