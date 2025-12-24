@@ -1250,14 +1250,43 @@ for row_indices in rows:
 # --- Data Table (Global) ---
 with st.expander("View Raw Data Metadata"):
     if datasets:
-        dataset_names = [d['label'] for d in datasets]
-        selected_meta_idx = st.selectbox("Select File to Inspect", range(len(datasets)), format_func=lambda i: dataset_names[i])
-        d = datasets[selected_meta_idx]
+        # Filter by Folder
+        batch_options = get_batch_options(datasets, st.session_state.get('custom_batches', {}))
+        selected_batch_name = st.selectbox("Filter by Folder", batch_options, index=0, key="meta_batch_filter")
         
-        metadata = {
-            "File Name": d["fileName"],
-            "Label": d["label"],
-            "Temperature (K)": d["temperatureK"],
+        if selected_batch_name != "All Folders":
+            filtered_datasets = [d for d in datasets if d.get('batch_name') == selected_batch_name]
+        else:
+            filtered_datasets = datasets
+            
+        if filtered_datasets:
+            dataset_names = [d['fileName'] for d in filtered_datasets]
+            selected_meta_idx = st.selectbox("Select File to Inspect", range(len(filtered_datasets)), format_func=lambda i: dataset_names[i], key="meta_file_sel")
+            d = filtered_datasets[selected_meta_idx]
+            
+            c_meta, c_data = st.columns([0.3, 0.7])
+            
+            with c_meta:
+                st.markdown("### Metadata")
+                metadata = {
+                    "File Name": d["fileName"],
+                    "Label": d["label"],
+                    "Temperature (K)": d["temperatureK"],
+                    "Direction": d["direction"],
+                    "Field Column": d["fieldCol"],
+                    "Resistance Column": d["rCol"],
+                    "Batch": d.get("batch_name", "None")
+                }
+                st.json(metadata)
+            
+            with c_data:
+                st.markdown("### Data Preview")
+                if 'full_df' in d:
+                    st.dataframe(d['full_df'], use_container_width=True, height=300)
+                else:
+                    st.info("Full dataframe not available.")
+        else:
+            st.info("No files in this folder.")
             "Direction": d["direction"],
             "Field Column": d["fieldCol"],
             "Resistance Column": d["rCol"],
