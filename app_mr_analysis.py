@@ -489,8 +489,8 @@ def render_file_actions(file_data: Dict[str, Any], current_batch_id: int, all_ba
     file_id = str(file_data.get('id', uuid.uuid4()))
     
     # Use a unique key for the popover based on file ID to prevent state leakage
-    # Note: Removed 'help' parameter as it might cause TypeError in some Streamlit versions
-    with st.popover("⋮", key=f"pop_{file_id}"):
+    # Note: Removed 'key' parameter from st.popover as it seems to cause TypeError in the user's environment
+    with st.popover("⋮", help="Manage File"):
         st.markdown("**Move File**")
         
         # Filter options: exclude current batch
@@ -507,14 +507,14 @@ def render_file_actions(file_data: Dict[str, Any], current_batch_id: int, all_ba
                     "Target", 
                     options=list(target_options.keys()), 
                     format_func=lambda x: target_options[x], 
-                    key=f"mv_sel_{file_data['id']}", 
+                    key=f"mv_sel_{file_id}", 
                     label_visibility="collapsed"
                 )
             with c_go:
                 target_name = target_options[target_bid]
                 st.button(
                     "Move", 
-                    key=f"mv_btn_{file_data['id']}", 
+                    key=f"mv_btn_{file_id}", 
                     use_container_width=True, 
                     on_click=move_file_callback, 
                     args=(file_data['id'], target_bid, target_name)
@@ -525,7 +525,7 @@ def render_file_actions(file_data: Dict[str, Any], current_batch_id: int, all_ba
         st.markdown("<hr style='margin: 5px 0; border: none; border-top: 1px solid #f0f0f0;'>", unsafe_allow_html=True)
         st.button(
             "Delete File", 
-            key=f"rm_{file_data['id']}", 
+            key=f"rm_{file_id}", 
             type="primary", 
             use_container_width=True, 
             on_click=delete_file_callback, 
