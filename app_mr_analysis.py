@@ -14,19 +14,7 @@ from typing import List, Dict, Any, Optional, Tuple
 # CONFIGURATION
 # -----------------------------------------------------------------------------
 
-EXPLICIT_FILES: List[Path] = [
-    Path("Nov2025/MRSRO0A9T.dat"),
-    Path("Nov2025/MRSRO0A9T4KUP.dat"),
-    Path("Nov2025/MRSRO0A9T10KUP.dat"),
-    Path("Nov2025/MRSRO0A9T20KUP.dat"),
-    Path("Nov2025/MRSRO0A9T40KUP.dat"),
-    Path("Nov2025/MRSRO0A9T60KUP.dat"),
-    Path("Nov2025/MRSRO0A9T100KUP.dat"),
-    Path("Nov2025/MRSRO0A9T120KUP.dat"),
-    Path("Nov2025/MRSRO0A9T140KUP.dat"),
-    Path("Nov2025/MRSRO0A9T150KUP.dat"),
-    Path("Nov2025/MRSRO0A9T200K.dat"),
-]
+# (Default files removed as requested)
 
 # -----------------------------------------------------------------------------
 # PARSING LOGIC (Adapted from original script)
@@ -269,99 +257,92 @@ def parse_multivu_content(content: str, filename: str) -> Dict[str, Any]:
 st.set_page_config(page_title="PPMS Analysis Tool", layout="wide")
 
 st.title("📊 PPMS Analysis Tool")
-st.markdown("""
-**Author:** Amir MEDDAS | [![LinkedIn](https://img.shields.io/badge/LinkedIn-0077B5?style=for-the-badge&logo=linkedin&logoColor=white)](https://www.linkedin.com/in/amir-meddas-80876424b/)
-""")
 st.markdown("Upload `.dat` files to analyze MR, Resistance, and Normalization.")
 
 # --- Sidebar: Configuration ---
 st.sidebar.header("Configuration")
 
+# Initialize Session State for Data
+if 'all_datasets' not in st.session_state:
+    st.session_state.all_datasets = []
+
 # File Selection
 st.sidebar.subheader("Data Source")
 uploaded_files = st.sidebar.file_uploader("Upload .dat files", type=["dat"], accept_multiple_files=True)
 
-# Local file discovery
-local_files = []
-use_default_files = st.sidebar.checkbox("Load Default Experiment Files (Nov2025)", value=True)
-
-if use_default_files:
-    for p in EXPLICIT_FILES:
-        if p.exists():
-            local_files.append(p)
-    if local_files:
-        st.sidebar.success(f"Loaded {len(local_files)} default files.")
-    else:
-        st.sidebar.warning("Default files not found in current directory.")
-
-# Combine files
-all_datasets = []
-
 # Process Uploaded Files
 if uploaded_files:
+    new_files_count = 0
     for uploaded_file in uploaded_files:
+        # Check if file already loaded to avoid duplicates
+        if any(d['fileName'] == uploaded_file.name for d in st.session_state.all_datasets):
+            continue
+            
         try:
             content = uploaded_file.getvalue().decode("utf-8", errors="ignore")
             data = parse_multivu_content(content, uploaded_file.name)
-            all_datasets.append(data)
+            st.session_state.all_datasets.append(data)
+            new_files_count += 1
         except Exception as e:
             st.error(f"Error parsing {uploaded_file.name}: {e}")
+    
+    if new_files_count > 0:
+        st.sidebar.success(f"Added {new_files_count} new files.")
 
-# Process Local Files
-if local_files:
-    for p in local_files:
-        try:
-            content = p.read_text(errors="ignore")
-            data = parse_multivu_content(content, p.name)
-            all_datasets.append(data)
-        except Exception as e:
-            # st.warning(f"Skipped {p.name}: {e}")
-            pass
+# Clear Data Button
+if st.sidebar.button("Clear All Data"):
+    st.session_state.all_datasets = []
+    st.rerun()
 
-# Remove duplicates (by filename)
-unique_datasets = {}
-for d in all_datasets:
-    unique_datasets[d['fileName']] = d
-datasets = list(unique_datasets.values())
+# Data Explorer / Filter
+datasets = st.session_state.all_datasets
 
 # Sort datasets
 datasets.sort(key=lambda d: (d['temperatureK'] if d['temperatureK'] is not None else 9999, d['fileName']))
 
-# Ensure unique labels to prevent "double curve" plotting issues
+# Ensure unique labels
 label_counts = {}
 for d in datasets:
     l = d['label']
     label_counts[l] = label_counts.get(l, 0) + 1
 
-seen_labels = {}
 for d in datasets:
     l = d['label']
     if label_counts[l] > 1:
-        # If duplicate, append filename to disambiguate
-        seen_labels[l] = seen_labels.get(l, 0) + 1
         d['label'] = f"{l} ({d['fileName']})"
 
 if not datasets:
-    st.info("Please upload files or enable local folder scanning to begin.")
+    st.info("Please upload files to begin.")
     st.stop()
 
-# --- Sidebar: Global Analysis Settings ---
-st.sidebar.subheader("Global Analysis Parameters")
+# Sidebar Data Explorer
+with st.sidebar.expander("📂 Data Explorer", expanded=False):
+    st.write(f"Total Files: {len(datasets)}")
+    
+    # Group by Sample
+    samples = sorted(list(set(d['label'].split()[0] for d in datasets)))
+    selected_sample_filter = st.selectbox("Filter by Sample", ["All"] + samples)
+    
+    filtered_view = datasets
+    if selected_sample_filter != "All":
+        filtered_view = [d for d in datasets if d['label'].startswith(selected_sample_filter)]
+    
+    st.dataframe(
+        pd.DataFrame([
+            {"Label": d['label'], "Temp (K)": d['temperatureK'], "File": d['fileName']} 
+            for d in filtered_view
+        ]),
+        hide_index=True
+    )
 
-r0_method = st.sidebar.selectbox(
-    "R0 Calculation Method",
-    ["Closest to 0T", "Mean within Window", "First Point"],
-    index=0
-)
-
-r0_window = 0.01
-if r0_method == "Mean within Window":
-    r0_window = st.sidebar.number_input("Zero Field Window (T)", value=0.01, step=0.005, format="%.4f")
-
-# Fun Button
+# --- Sidebar: Footer ---
 st.sidebar.markdown("---")
-if st.sidebar.button("🎉 Surprise Me!"):
-    st.balloons()
+st.sidebar.markdown("""
+**Author:** Amir MEDDAS  
+*C2N - Centre de Nanosciences et de Nanotechnologies*  
+*LPS - Laboratoire de Physique des Solides*  
+[![LinkedIn](https://img.shields.io/badge/LinkedIn-0077B5?style=for-the-badge&logo=linkedin&logoColor=white)](https://www.linkedin.com/in/amir-meddas-80876424b/)
+""")
 
 # -----------------------------------------------------------------------------
 # PLOTTING INTERFACE
@@ -422,7 +403,7 @@ def create_plot_interface(plot_id: str, available_datasets: List[Dict[str, Any]]
         # Row 0: Analysis Mode
         analysis_mode = st.selectbox(
             "Analysis Mode",
-            ["Standard MR Analysis", "Custom Columns"],
+            ["Custom Columns", "Standard MR Analysis"],
             index=0,
             key=f"mode_{plot_id}"
         )
@@ -435,6 +416,17 @@ def create_plot_interface(plot_id: str, available_datasets: List[Dict[str, Any]]
         custom_y_col = None
         
         if analysis_mode == "Standard MR Analysis":
+            # R0 Method (Moved from Global)
+            r0_method = st.selectbox(
+                "R0 Calculation Method",
+                ["Closest to 0T", "Mean within Window", "First Point"],
+                index=0,
+                key=f"r0_meth_{plot_id}"
+            )
+            r0_window = 0.01
+            if r0_method == "Mean within Window":
+                r0_window = st.number_input("Zero Field Window (T)", value=0.01, step=0.005, format="%.4f", key=f"r0_win_{plot_id}")
+
             with c1:
                 y_axis_mode = st.selectbox(
                     "Y-Axis Mode",
@@ -453,20 +445,32 @@ def create_plot_interface(plot_id: str, available_datasets: List[Dict[str, Any]]
             # Custom Columns Mode
             # Get columns from the first available dataset as reference
             ref_cols = []
-            if available_datasets and 'full_df' in available_datasets[0]:
-                # Filter columns that are not empty (all NaNs)
-                # We check the first dataset as a proxy. 
-                # Ideally we should check all, but that's expensive.
-                # Let's check the first one.
-                df_ref = available_datasets[0]['full_df']
-                # Drop columns where all values are None/NaN
+            
+            # File Selector (Multiselect) - Moved up to determine available columns
+            options = [d['label'] for d in available_datasets]
+            default_sel = options if plot_id == "1" else []
+            selected_labels = st.multiselect(f"Select Curves for Plot {plot_id}", options, default=default_sel, key=f"sel_{plot_id}")
+            selected_datasets = [d for d, label in zip(available_datasets, options) if label in selected_labels]
+
+            if selected_datasets:
+                # Find common non-empty columns or just take from first
+                # Let's take the first one for simplicity but filter for non-empty
+                df_ref = selected_datasets[0]['full_df']
                 valid_cols = df_ref.dropna(axis=1, how='all').columns.tolist()
                 ref_cols = valid_cols
-            
+            elif available_datasets:
+                 # Fallback if nothing selected yet
+                df_ref = available_datasets[0]['full_df']
+                valid_cols = df_ref.dropna(axis=1, how='all').columns.tolist()
+                ref_cols = valid_cols
+
             with c1:
                 custom_y_col = st.selectbox("Y Column", ref_cols, index=0 if ref_cols else 0, key=f"y_col_{plot_id}")
             with c2:
                 custom_x_col = st.selectbox("X Column", ref_cols, index=1 if len(ref_cols) > 1 else 0, key=f"x_col_{plot_id}")
+            
+            # Oe to T conversion
+            convert_oe_to_t = st.checkbox("Convert X from Oe to Tesla (x 10^-4)", value=False, key=f"conv_oe_{plot_id}")
 
         # Row 2: Processing (Smoothing & Symmetrize)
         c4, c5 = st.columns([1, 1], vertical_alignment="bottom")
@@ -480,14 +484,12 @@ def create_plot_interface(plot_id: str, available_datasets: List[Dict[str, Any]]
                 symmetrize = False
                 plot_derivative = st.toggle("Plot Derivative (dY/dX)", value=False, key=f"deriv_{plot_id}", help="Plot dY/dX vs X")
 
-        # File Selector (Multiselect)
-        options = [d['label'] for d in available_datasets]
-        
-        # Default selection: Select all for the first plot, maybe none for others to start clean?
-        default_sel = options if plot_id == "1" else []
-        
-        selected_labels = st.multiselect(f"Select Curves for Plot {plot_id}", options, default=default_sel, key=f"sel_{plot_id}")
-        selected_datasets = [d for d, label in zip(available_datasets, options) if label in selected_labels]
+        # File Selector (Multiselect) - Only show if not already shown in Custom Mode
+        if analysis_mode == "Standard MR Analysis":
+            options = [d['label'] for d in available_datasets]
+            default_sel = options if plot_id == "1" else []
+            selected_labels = st.multiselect(f"Select Curves for Plot {plot_id}", options, default=default_sel, key=f"sel_{plot_id}")
+            selected_datasets = [d for d, label in zip(available_datasets, options) if label in selected_labels]
 
         if not selected_datasets:
             st.info("Select at least one file to display the plot.")
@@ -678,6 +680,16 @@ def create_plot_interface(plot_id: str, available_datasets: List[Dict[str, Any]]
                 mask = x_data.notna() & y_data.notna()
                 x_data = x_data[mask]
                 y_data = y_data[mask]
+
+                # Convert Oe to T if requested
+                if convert_oe_to_t:
+                    x_data = x_data * 1e-4
+                    if "Oe" in x_label:
+                        x_label = x_label.replace("Oe", "T")
+                    elif "Oersted" in x_label:
+                        x_label = x_label.replace("Oersted", "T")
+                    else:
+                        x_label = f"{x_label} (T)"
 
                 if plot_derivative:
                     # Sort by X for derivative calculation
