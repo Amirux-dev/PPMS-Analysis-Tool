@@ -784,7 +784,7 @@ else:
     st.sidebar.info("Upload files to begin.")
     st.sidebar.markdown("---")
     st.sidebar.markdown("""
-**Author:** Amir MEDDAS  
+**Author :** Amir MEDDAS  
 *LPS - Laboratoire de Physique des Solides*                          
 *C2N - Centre de Nanosciences et de Nanotechnologies*  
 [![LinkedIn](https://img.shields.io/badge/LinkedIn-0077B5?style=for-the-badge&logo=linkedin&logoColor=white)](https://www.linkedin.com/in/amir-meddas-80876424b/)
@@ -966,7 +966,8 @@ def create_plot_interface(plot_id: str, available_datasets: List[Dict[str, Any]]
                     key=f"y_mode_{plot_id}"
                 )
             with c2:
-                st.info("X-Axis: Temperature (K)")
+                # Use disabled selectbox for alignment
+                st.selectbox("X-Axis", ["Temperature (K)"], disabled=True, key=f"x_unit_{plot_id}")
         else:
             # Custom Columns Mode
             ref_cols = []
@@ -980,31 +981,50 @@ def create_plot_interface(plot_id: str, available_datasets: List[Dict[str, Any]]
                 valid_cols = df_ref.dropna(axis=1, how='all').columns.tolist()
                 ref_cols = valid_cols
 
+            # Check for Oe column to offer Tesla conversion
+            display_cols = list(ref_cols)
+            has_oe = any("Oe" in c or "Oersted" in c for c in ref_cols)
+            if has_oe:
+                display_cols.append("Magnetic Field (T)")
+
             with c1:
-                custom_y_col = st.selectbox("Y Column", ref_cols, index=0 if ref_cols else 0, key=f"y_col_{plot_id}")
+                custom_y_col = st.selectbox("Y Column", display_cols, index=0 if display_cols else 0, key=f"y_col_{plot_id}")
             with c2:
-                custom_x_col = st.selectbox("X Column", ref_cols, index=1 if len(ref_cols) > 1 else 0, key=f"x_col_{plot_id}")
+                custom_x_col = st.selectbox("X Column", display_cols, index=1 if len(display_cols) > 1 else 0, key=f"x_col_{plot_id}")
             
-            # Oe to T conversion
-            convert_oe_to_t = st.checkbox("Convert X from Oe to Tesla (x 10^-4)", value=False, key=f"conv_oe_{plot_id}")
+            # Oe to T conversion removed (handled by virtual column)
 
         # Row 2: Processing
         c4, c5 = st.columns([1, 1], vertical_alignment="bottom")
         with c4:
             smooth_window = st.number_input("Smoothing (pts)", min_value=0, value=0, step=1, key=f"smooth_{plot_id}", help="Moving average window size.")
         with c5:
+            # Common Toggles
+            show_linear_fit = st.toggle("Show Linear Fit", value=False, key=f"fit_{plot_id}", help="Fit Y = aX + b")
+            
             if analysis_mode == "Standard MR Analysis":
                 symmetrize = st.toggle("Symmetrize Data", value=False, key=f"sym_{plot_id}", help="R(H) = (R(H) + R(-H))/2")
                 plot_derivative = False
-                show_linear_fit = False
             elif analysis_mode == "Standard R-T Analysis":
                 symmetrize = False
                 plot_derivative = False
-                show_linear_fit = False
             else:
                 symmetrize = False
                 plot_derivative = st.toggle("Plot Derivative (dY/dX)", value=False, key=f"deriv_{plot_id}", help="Plot dY/dX vs X")
-                show_linear_fit = st.toggle("Show Linear Fit", value=False, key=f"fit_{plot_id}", help="Fit Y = aX + b")
+
+        # Fit Settings (Conditional)
+        fit_range_min = None
+        fit_range_max = None
+        
+        if show_linear_fit:
+            with st.popover("📏 Fit Settings", width='stretch'):
+                st.markdown("**Linear Fit Range (X-Axis)**")
+                c_fmin, c_fmax = st.columns(2)
+                with c_fmin:
+                    fit_range_min = st.number_input("Min X", value=None, placeholder="Start", key=f"fmin_{plot_id}")
+                with c_fmax:
+                    fit_range_max = st.number_input("Max X", value=None, placeholder="End", key=f"fmax_{plot_id}")
+                st.caption("Leave empty to fit the entire range.")
 
         if not selected_datasets:
             st.info("Select at least one file to display the plot.")
@@ -1216,32 +1236,32 @@ def create_plot_interface(plot_id: str, available_datasets: List[Dict[str, Any]]
                 
                 full_df = d['full_df']
                 
-                if custom_x_col not in full_df.columns:
+                # Helper to get data (handling virtual columns)
+                def get_col_data(col_name, df):
+                    if col_name == "Magnetic Field (T)":
+                        # Find Oe column
+                        for c in df.columns:
+                            if "Oe" in c or "Oersted" in c:
+                                return df[c] * 1e-4, "Magnetic Field (T)"
+                        return None, None
+                    elif col_name in df.columns:
+                        return df[col_name], col_name
+                    return None, None
+
+                x_data, x_label = get_col_data(custom_x_col, full_df)
+                y_data, y_label = get_col_data(custom_y_col, full_df)
+
+                if x_data is None:
                     st.warning(f"Column '{custom_x_col}' not found in {d['label']}")
                     continue
-                if custom_y_col not in full_df.columns:
+                if y_data is None:
                     st.warning(f"Column '{custom_y_col}' not found in {d['label']}")
                     continue
-                    
-                x_data = full_df[custom_x_col]
-                y_data = full_df[custom_y_col]
-                x_label = custom_x_col
-                y_label = custom_y_col
                 
                 # Drop NaNs
                 mask = x_data.notna() & y_data.notna()
                 x_data = x_data[mask]
                 y_data = y_data[mask]
-
-                # Convert Oe to T if requested
-                if convert_oe_to_t:
-                    x_data = x_data * 1e-4
-                    if "Oe" in x_label:
-                        x_label = x_label.replace("Oe", "T")
-                    elif "Oersted" in x_label:
-                        x_label = x_label.replace("Oersted", "T")
-                    else:
-                        x_label = f"{x_label} (T)"
 
                 if plot_derivative:
                     # Sort by X for derivative calculation
@@ -1291,6 +1311,13 @@ def create_plot_interface(plot_id: str, available_datasets: List[Dict[str, Any]]
             if show_linear_fit and x_data is not None and y_data is not None:
                 # Remove NaNs for fitting
                 mask_fit = x_data.notna() & y_data.notna()
+                
+                # Apply Range Filter
+                if fit_range_min is not None:
+                    mask_fit &= (x_data >= fit_range_min)
+                if fit_range_max is not None:
+                    mask_fit &= (x_data <= fit_range_max)
+                
                 xf = x_data[mask_fit]
                 yf = y_data[mask_fit]
                 
@@ -1299,22 +1326,36 @@ def create_plot_interface(plot_id: str, available_datasets: List[Dict[str, Any]]
                     slope, intercept = np.polyfit(xf, yf, 1)
                     y_fit = slope * xf + intercept
                     
+                    # Plot the fit line only within the range
                     fig.add_trace(go.Scatter(
                         x=xf,
                         y=y_fit,
                         mode='lines',
                         name=f"Fit {legend_name}",
-                        line=dict(dash='dash', width=1),
+                        line=dict(dash='dash', width=2, color='red'),
                         hoverinfo='skip'
                     ))
                     
-                    # Add annotation
+                    # Enhanced Annotation
+                    eq_text = f"<b>y = {slope:.3e} x + {intercept:.3e}</b>"
+                    
+                    # Position annotation near the center of the fit segment
+                    mid_idx = len(xf) // 2
+                    
                     fig.add_annotation(
-                        x=xf.iloc[-1],
-                        y=y_fit.iloc[-1],
-                        text=f"y = {slope:.2e}x + {intercept:.2e}",
+                        x=xf.iloc[mid_idx],
+                        y=y_fit.iloc[mid_idx],
+                        text=eq_text,
                         showarrow=True,
-                        arrowhead=1
+                        arrowhead=2,
+                        arrowsize=1,
+                        arrowwidth=2,
+                        ax=0,
+                        ay=-40,
+                        bgcolor="rgba(255, 255, 255, 0.8)",
+                        bordercolor="black",
+                        borderwidth=1,
+                        font=dict(size=14, color="black")
                     )
 
             # Add to export
