@@ -647,13 +647,20 @@ def duplicate_plot_callback(plot_id):
             new_key = key.replace(f"_{plot_id}_", f"_{new_id}_")
             st.session_state[new_key] = st.session_state[key]
 
-def get_batch_options(datasets: List[Dict[str, Any]]) -> List[str]:
+def get_batch_options(datasets: List[Dict[str, Any]], custom_batches: Dict[int, str] = None) -> List[str]:
     """Returns a stable list of batch names for dropdowns."""
     unique_batches = {}
+    
+    # 1. From Datasets
     for d in datasets:
         bid = d.get('batch_id', 0)
         bname = d.get('batch_name', 'Unknown')
         unique_batches[bid] = bname
+        
+    # 2. From Custom Batches (Empty folders)
+    if custom_batches:
+        for bid, bname in custom_batches.items():
+            unique_batches[bid] = bname
     
     # Sort by ID for stability
     sorted_ids = sorted(unique_batches.keys())
@@ -697,7 +704,7 @@ def create_plot_interface(plot_id: str, available_datasets: List[Dict[str, Any]]
         
         # --- Unified File Selection (Moved to Top) ---
         # Filter by Folder (Batch)
-        batch_options = get_batch_options(available_datasets)
+        batch_options = get_batch_options(available_datasets, st.session_state.get('custom_batches', {}))
         selected_batch_name = st.selectbox("Filter by Folder", batch_options, index=0, key=f"batch_filter_{plot_id}")
         
         if selected_batch_name != "All Folders":
@@ -706,19 +713,22 @@ def create_plot_interface(plot_id: str, available_datasets: List[Dict[str, Any]]
             filtered_datasets = available_datasets
 
         # Use Raw Filenames for Selection
-        options = [d['fileName'] for d in filtered_datasets]
+        # CRITICAL FIX: Options must include currently selected files even if they are filtered out
+        # This prevents selection loss when switching folders
+        filtered_filenames = [d['fileName'] for d in filtered_datasets]
+        current_selection = st.session_state.get(f"sel_{plot_id}", [])
         
-        # Ensure default selection is valid
-        current_sel = st.session_state.get(f"sel_{plot_id}", [])
-        valid_sel = [f for f in current_sel if f in options]
+        # Combine and sort unique options
+        combined_options = sorted(list(set(filtered_filenames + current_selection)))
         
         selected_filenames = st.multiselect(
             f"Select Curves for Plot {plot_id}", 
-            options, 
-            default=valid_sel if not st.session_state.get(f"sel_{plot_id}") else None, # Use default only if no state
+            options=combined_options,
             key=f"sel_{plot_id}"
         )
-        selected_datasets = [d for d in filtered_datasets if d['fileName'] in selected_filenames]
+        
+        # Map back to datasets (look in ALL available datasets)
+        selected_datasets = [d for d in available_datasets if d['fileName'] in selected_filenames]
         
         # Row 1: Axes & Style
         c1, c2 = st.columns([2, 1])
