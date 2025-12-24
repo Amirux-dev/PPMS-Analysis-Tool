@@ -973,8 +973,8 @@ def duplicate_plot_callback(plot_id):
     
     # Copy state
     for key in list(st.session_state.keys()):
-        # Exclude buttons
-        if any(x in key for x in ["dup_", "add_btn_", "del_btn_"]): continue
+        # Exclude buttons and temporary states
+        if any(x in key for x in ["dup_", "add_btn_", "del_btn_", "ren_btn_"]): continue
         
         # Case 1: Key ends with _{plot_id} (Standard widgets)
         if key.endswith(f"_{plot_id}"):
@@ -1032,7 +1032,7 @@ def create_plot_interface(plot_id: str, available_datasets: List[Dict[str, Any]]
         # Row 0: Analysis Mode
         analysis_mode = persistent_selectbox(
             "Analysis Mode",
-            ["Custom Columns", "Standard MR Analysis", "Standard R-T Analysis"],
+            ["Custom Columns", "Standard MR Analysis", "Standard R-H Analysis", "Standard R-T Analysis"],
             index=0,
             persistent_key=f"mode_{plot_id}"
         )
@@ -1210,24 +1210,29 @@ def create_plot_interface(plot_id: str, available_datasets: List[Dict[str, Any]]
             
             # Oe to T conversion removed (handled by virtual column)
 
-        # Row 2: Processing
-        c4, c5 = st.columns([1, 1], vertical_alignment="bottom")
-        with c4:
+        # Row 2: Processing - Harmonized UI
+        st.markdown("###### Processing & Fits")
+        c_smooth, c_fit1, c_fit2, c_proc = st.columns(4, vertical_alignment="center")
+        
+        with c_smooth:
             smooth_window = persistent_input(st.number_input, f"smooth_{plot_id}", label="Smoothing (pts)", min_value=0, value=0, step=1, help="Moving average window size.")
-        with c5:
-            # Common Toggles
-            show_linear_fit = persistent_input(st.toggle, f"fit_{plot_id}", label="Show Linear Fit", value=False, help="Fit Y = aX + b")
-            show_parabolic_fit = persistent_input(st.toggle, f"pfit_{plot_id}", label="Show Parabolic Fit", value=False, help="Fit Y = aX² + bX + c")
+        
+        with c_fit1:
+            show_linear_fit = persistent_input(st.toggle, f"fit_{plot_id}", label="Linear Fit", value=False, help="Fit Y = aX + b")
+        
+        with c_fit2:
+            show_parabolic_fit = persistent_input(st.toggle, f"pfit_{plot_id}", label="Parabolic Fit", value=False, help="Fit Y = aX² + bX + c")
             
-            if analysis_mode == "Standard MR Analysis":
-                symmetrize = persistent_input(st.toggle, f"sym_{plot_id}", label="Symmetrize Data", value=False, help="R(H) = (R(H) + R(-H))/2")
+        with c_proc:
+            if analysis_mode in ["Standard MR Analysis", "Standard R-H Analysis"]:
+                symmetrize = persistent_input(st.toggle, f"sym_{plot_id}", label="Symmetrize", value=False, help="Mirror positive field data to negative field (Force Symmetry)")
                 plot_derivative = False
             elif analysis_mode == "Standard R-T Analysis":
                 symmetrize = False
                 plot_derivative = False
             else:
                 symmetrize = False
-                plot_derivative = persistent_input(st.toggle, f"deriv_{plot_id}", label="Plot Derivative (dY/dX)", value=False, help="Plot dY/dX vs X")
+                plot_derivative = persistent_input(st.toggle, f"deriv_{plot_id}", label="Derivative", value=False, help="Plot dY/dX vs X")
 
         # Fit Settings (Conditional)
         fit_range_min = None
@@ -1349,51 +1354,43 @@ def create_plot_interface(plot_id: str, available_datasets: List[Dict[str, Any]]
             x_label = ""
             y_label = ""
 
-            if analysis_mode == "Standard MR Analysis":
+            if analysis_mode in ["Standard MR Analysis", "Standard R-H Analysis"]:
                 df = pd.DataFrame({"H_T": d["H_T"], "R": d["R"]})
                 
-                # Symmetrization (R_sym(H) = (R(H) + R(-H))/2)
+                # Symmetrization (Mirror Positive Field Data)
                 if symmetrize:
-                    # 1. Sort by Field
-                    df = df.sort_values(by="H_T")
+                    # Filter Positive Field Data
+                    df_pos = df[df["H_T"] >= 0].copy()
                     
-                    max_h = df["H_T"].abs().max()
-                    
-                    df_sorted = df.sort_values("H_T")
-                    h_sorted = df_sorted["H_T"].values
-                    r_sorted = df_sorted["R"].values
-                    
-                    target_h = np.linspace(0, max_h, num=int(max_h/0.01) + 100)
-                    
-                    # Interpolate
-                    r_plus = np.interp(target_h, h_sorted, r_sorted)
-                    r_minus = np.interp(-target_h, h_sorted, r_sorted)
-                    
-                    r_sym = (r_plus + r_minus) / 2.0
-                    
-                    # Reconstruct full symmetric curve
-                    final_h = np.concatenate([-target_h[::-1], target_h])
-                    final_r = np.concatenate([r_sym[::-1], r_sym])
-                    
-                    # Update df for subsequent processing
-                    df = pd.DataFrame({"H_T": final_h, "R": final_r})
-
-                # Calculate R0
-                r0 = 1.0
-                if r0_method == "First Point":
-                    r0 = df["R"].iloc[0]
-                elif r0_method == "Closest to 0T":
-                    idx = df["H_T"].abs().idxmin()
-                    r0 = df["R"].iloc[idx]
-                elif r0_method == "Mean within Window":
-                    mask = df["H_T"].abs() <= r0_window
-                    if mask.any():
-                        r0 = df.loc[mask, "R"].mean()
+                    if not df_pos.empty:
+                        # Create Negative Field Data (Mirror)
+                        df_neg = df_pos.copy()
+                        df_neg["H_T"] = -df_neg["H_T"]
+                        
+                        # Combine and Sort
+                        df = pd.concat([df_neg, df_pos], ignore_index=True)
+                        df = df.sort_values(by="H_T")
                     else:
+                        # Fallback if no positive data
+                        st.warning(f"Cannot symmetrize {d['fileName']}: No positive field data found.")
+
+                # Calculate R0 (Only for MR Analysis)
+                r0 = 1.0
+                if analysis_mode == "Standard MR Analysis":
+                    if r0_method == "First Point":
+                        r0 = df["R"].iloc[0]
+                    elif r0_method == "Closest to 0T":
                         idx = df["H_T"].abs().idxmin()
                         r0 = df["R"].iloc[idx]
-                elif r0_method == "Max Resistance":
-                    r0 = df["R"].max()
+                    elif r0_method == "Mean within Window":
+                        mask = df["H_T"].abs() <= r0_window
+                        if mask.any():
+                            r0 = df.loc[mask, "R"].mean()
+                        else:
+                            idx = df["H_T"].abs().idxmin()
+                            r0 = df["R"].iloc[idx]
+                    elif r0_method == "Max Resistance":
+                        r0 = df["R"].max()
 
                 # Calculate X
                 x_data = df["H_T"]
@@ -1403,23 +1400,27 @@ def create_plot_interface(plot_id: str, available_datasets: List[Dict[str, Any]]
                     x_label = "Field (Oe)"
 
                 # Calculate Y
-                y_data = df["R"]
-                y_label = "Resistance (Ω)"
-                
-                if y_axis_mode == "Magnetoresistance (MR %)":
-                    y_data = 100 * (df["R"] - r0) / r0
-                    y_label = "MR (%)"
-                elif y_axis_mode == "Normalized (R/R0)":
-                    y_data = df["R"] / r0
-                    y_label = "R / R0"
-                elif y_axis_mode == "Derivative (dR/dH)":
-                    # Simple finite difference
-                    dy = df["R"].diff()
-                    dx = df["H_T"].diff()
-                    y_data = dy / dx
-                    y_label = "dR/dH (Ω/T)"
-                    # Remove first NaN
-                    y_data = y_data.fillna(0)
+                if analysis_mode == "Standard MR Analysis":
+                    if y_axis_mode == "Magnetoresistance (MR %)":
+                        y_data = 100 * (df["R"] - r0) / r0
+                        y_label = "MR (%)"
+                    elif y_axis_mode == "Normalized (R/R0)":
+                        y_data = df["R"] / r0
+                        y_label = "R / R0"
+                    elif y_axis_mode == "Derivative (dR/dH)":
+                        # Simple finite difference
+                        dy = df["R"].diff()
+                        dx = df["H_T"].diff()
+                        y_data = dy / dx
+                        y_label = "dR/dH (Ω/T)"
+                        # Remove first NaN
+                        y_data = y_data.fillna(0)
+                    else: # Resistance
+                        y_data = df["R"]
+                        y_label = "Resistance (Ω)"
+                else: # Standard R-H Analysis
+                    y_data = df["R"]
+                    y_label = "Resistance (Ω)"
             
             elif analysis_mode == "Standard R-T Analysis":
                 if 'full_df' not in d:
