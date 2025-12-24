@@ -1510,23 +1510,10 @@ def create_plot_interface(plot_id: str, available_datasets: List[Dict[str, Any]]
                 dfs_to_process = [(df_base, "")]
                 
                 if symmetrize:
-                    # Symmetrization Logic
+                    # Simple Mirror Logic: (H, R) -> (-H, R)
+                    # Plots the symmetric of the curve with respect to the Y-axis
                     df_sym = df_base.copy()
-                    df_sym["H_T"] = df_sym["H_T"].abs()
-                    
-                    # Average data with same H (to remove hysteresis/oscillations)
-                    # Use coarser rounding (3 decimals = 1mT) to ensure up/down sweeps are merged
-                    df_sym["H_round"] = df_sym["H_T"].round(3) 
-                    df_sym = df_sym.groupby("H_round", as_index=False).mean()
-                    df_sym = df_sym.drop(columns=["H_round"])
-                    
-                    # Mirror
-                    df_neg = df_sym.copy()
-                    df_neg["H_T"] = -df_neg["H_T"]
-                    
-                    # Combine
-                    df_sym = pd.concat([df_neg, df_sym], ignore_index=True)
-                    df_sym = df_sym.sort_values(by="H_T")
+                    df_sym["H_T"] = -df_sym["H_T"]
                     
                     dfs_to_process.append((df_sym, " (Sym)"))
 
