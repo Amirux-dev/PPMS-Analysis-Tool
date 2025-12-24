@@ -311,24 +311,22 @@ if not datasets:
     st.stop()
 
 # Sidebar Data Explorer
-with st.sidebar.expander("📂 Data Explorer", expanded=False):
-    st.write(f"Total Files: {len(datasets)}")
-    
-    # Group by Sample
-    samples = sorted(list(set(d['label'].split()[0] for d in datasets)))
-    selected_sample_filter = st.selectbox("Filter by Sample", ["All"] + samples)
-    
-    filtered_view = datasets
-    if selected_sample_filter != "All":
-        filtered_view = [d for d in datasets if d['label'].startswith(selected_sample_filter)]
-    
-    st.dataframe(
-        pd.DataFrame([
-            {"Label": d['label'], "Temp (K)": d['temperatureK'], "File": d['fileName']} 
-            for d in filtered_view
-        ]),
-        hide_index=True
-    )
+st.sidebar.subheader("📂 Data Explorer")
+st.sidebar.write(f"Total Files: {len(datasets)}")
+
+# Group by Sample (First word of label)
+files_by_sample = {}
+for d in datasets:
+    # Extract sample name from label (first word)
+    sample = d['label'].split()[0]
+    if sample not in files_by_sample:
+        files_by_sample[sample] = []
+    files_by_sample[sample].append(d)
+
+for sample, sample_datasets in files_by_sample.items():
+    with st.sidebar.expander(f"📁 {sample} ({len(sample_datasets)})"):
+        for d in sample_datasets:
+            st.text(f"📄 {d['fileName']}")
 
 # --- Sidebar: Footer ---
 st.sidebar.markdown("---")
@@ -443,7 +441,7 @@ def create_plot_interface(plot_id: str, available_datasets: List[Dict[str, Any]]
             
             # File Selector (Multiselect) - Moved up to determine available columns
             options = [d['label'] for d in available_datasets]
-            default_sel = options if plot_id == "1" else []
+            default_sel = [] # Default to empty selection
             selected_labels = st.multiselect(f"Select Curves for Plot {plot_id}", options, default=default_sel, key=f"sel_{plot_id}")
             selected_datasets = [d for d, label in zip(available_datasets, options) if label in selected_labels]
 
@@ -482,7 +480,7 @@ def create_plot_interface(plot_id: str, available_datasets: List[Dict[str, Any]]
         # File Selector (Multiselect) - Only show if not already shown in Custom Mode
         if analysis_mode == "Standard MR Analysis":
             options = [d['label'] for d in available_datasets]
-            default_sel = options if plot_id == "1" else []
+            default_sel = [] # Default to empty selection
             selected_labels = st.multiselect(f"Select Curves for Plot {plot_id}", options, default=default_sel, key=f"sel_{plot_id}")
             selected_datasets = [d for d, label in zip(available_datasets, options) if label in selected_labels]
 
