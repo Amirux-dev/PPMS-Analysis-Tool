@@ -15,22 +15,107 @@ from typing import List, Dict, Any, Optional, Tuple
 # PARSING LOGIC (Adapted from original script)
 # -----------------------------------------------------------------------------
 
-def parse_temperature_from_filename(name: str) -> Optional[float]:
-    m = re.search(r"(\d+(?:\.\d+)?)\s*K", name, flags=re.IGNORECASE)
-    if m:
-        return float(m.group(1))
-    m = re.search(r"(\d+(?:\.\d+)?)K", name, flags=re.IGNORECASE)
-    if m:
-        return float(m.group(1))
-    return None
+def extract_metadata(filename: str) -> Dict[str, Any]:
+    """
+    Extracts metadata (Sample, Temp, Field, State, etc.) from the filename using robust regex patterns.
+    """
+    meta = {
+        "sample": "Sample",
+        "temp": None,
+        "field": None,
+        "voltage": None,
+        "state": None,
+        "direction": "unknown",
+        "meas_type": None
+    }
+    
+    name_clean = filename.replace(".dat", "")
+    
+    # 1. Sample Name (First alphanumeric block)
+    parts = re.split(r'[_\s]+', name_clean)
+    if parts and parts[0]:
+        meta["sample"] = parts[0]
+        
+    # Specific overrides for common samples (optional)
+    if "SRO" in name_clean.upper() and meta["sample"] == "Sample": meta["sample"] = "SrRuO3"
+    if "STO" in name_clean.upper() and meta["sample"] == "Sample": meta["sample"] = "SrTiO3"
 
-def infer_direction_from_filename(name: str) -> str:
-    up = name.upper()
-    if "DOWN" in up or "DN" in up:
-        return "DOWN"
-    if "UP" in up:
-        return "UP"
-    return "unknown"
+    # 2. Temperature
+    # Matches: 300K, 10.5K, 5 K, T=5K
+    m_temp = re.search(r"(?:T=)?(\d+(?:\.\d+)?)\s*K", name_clean, re.IGNORECASE)
+    if m_temp:
+        meta["temp"] = float(m_temp.group(1))
+
+    # 3. Magnetic Field
+    # Matches: 9T, 0.5T, 1000Oe, 9Tesla
+    m_field = re.search(r"(\d+(?:\.\d+)?)\s*(T|Oe|Tesla)", name_clean, re.IGNORECASE)
+    if m_field:
+        val = float(m_field.group(1))
+        unit = m_field.group(2).lower()
+        if "oe" in unit:
+            meta["field"] = f"{val:g}Oe"
+        else:
+            meta["field"] = f"{val:g}T"
+
+    # 4. Voltage / Current
+    m_volt = re.search(r"(\d+(?:\.\d+)?)\s*(V|mV|uA|mA)", name_clean, re.IGNORECASE)
+    if m_volt:
+        meta["voltage"] = f"{float(m_volt.group(1)):g}{m_volt.group(2)}"
+
+    # 5. State / Geometry
+    states = []
+    if re.search(r"Comp", name_clean, re.IGNORECASE): states.append("Comp")
+    if re.search(r"Tens", name_clean, re.IGNORECASE): states.append("Tens")
+    if re.search(r"IP|InPlane", name_clean, re.IGNORECASE): states.append("IP")
+    if re.search(r"OOP|OutPlane", name_clean, re.IGNORECASE): states.append("OOP")
+    if states:
+        meta["state"] = " ".join(states)
+
+    # 6. Direction
+    if re.search(r"UP", name_clean, re.IGNORECASE):
+        meta["direction"] = "UP"
+    elif re.search(r"DOWN|DN", name_clean, re.IGNORECASE):
+        meta["direction"] = "DOWN"
+        
+    # 7. Measurement Type (RT, RH, IV)
+    if re.search(r"RT", name_clean, re.IGNORECASE):
+        meta["meas_type"] = "RT"
+    elif re.search(r"RH", name_clean, re.IGNORECASE):
+        meta["meas_type"] = "RH"
+        
+    return meta
+
+def generate_label(metadata: Dict[str, Any]) -> str:
+    """Generates a clean label from extracted metadata."""
+    components = []
+    
+    # Sample
+    if metadata.get("sample"):
+        components.append(metadata["sample"])
+        
+    # Measurement Type + Field
+    if metadata.get("meas_type"):
+        if metadata.get("field") and metadata["meas_type"] == "RT":
+             components.append(f"RT{metadata['field']}")
+        else:
+             components.append(metadata["meas_type"])
+             if metadata.get("field"): components.append(metadata["field"])
+    elif metadata.get("field"):
+        components.append(metadata["field"])
+        
+    if metadata.get("voltage"):
+        components.append(metadata["voltage"])
+        
+    if metadata.get("state"):
+        components.append(metadata["state"])
+        
+    if metadata.get("temp"):
+        components.append(f"{int(math.ceil(metadata['temp']))}K")
+        
+    if metadata.get("direction") and metadata["direction"] != "unknown":
+        components.append(metadata["direction"])
+        
+    return " ".join(components)
 
 def choose_field_column(cols: List[str]) -> int:
     preferred = ["Magnetic Field (T)", "Magnetic Field (Oe)", "Field (T)", "Field (Oe)"]
@@ -45,6 +130,17 @@ def choose_field_column(cols: List[str]) -> int:
             lc = c.lower()
             return (0 if "(t" in lc else 1, 0 if "(oe" in lc else 1, len(lc))
         hits.sort(key=score)
+        return hits[0][0]
+    return -1
+
+def choose_temperature_column(cols: List[str]) -> int:
+    preferred = ["Temperature (K)", "Temp (K)", "T (K)"]
+    for p in preferred:
+        if p in cols:
+            return cols.index(p)
+    
+    hits = [(i, c) for i, c in enumerate(cols) if "temp" in c.lower()]
+    if hits:
         return hits[0][0]
     return -1
 
@@ -94,52 +190,6 @@ def field_to_tesla(h: float, field_col_name: str) -> float:
     if "(oe" in lc or "oersted" in lc:
         return h * 1e-4
     return h
-
-def generate_smart_label(filename: str, temp: Optional[float], direction: str) -> str:
-    # 1. Extract Sample (First alphanumeric block usually)
-    sample = "Sample"
-    parts = re.split(r'[_\s]+', filename)
-    if parts and parts[0].isalnum():
-        sample = parts[0]
-            
-    # Specific overrides
-    if "SRO" in filename.upper() and sample == "Sample": sample = "SrRuO3"
-    if "STO" in filename.upper() and sample == "Sample": sample = "SrTiO3"
-
-    # 2. Extract Voltage (e.g. 15V)
-    voltage = ""
-    m_volt = re.search(r"(\d+V)", filename, re.IGNORECASE)
-    if m_volt:
-        voltage = m_volt.group(1)
-
-    # 3. Extract State (Comp/Tens)
-    state = ""
-    if re.search(r"Comp", filename, re.IGNORECASE):
-        state = "Comp"
-    elif re.search(r"Tens", filename, re.IGNORECASE):
-        state = "Tens"
-
-    # 4. Extract Measurement Type (e.g. RT0T, RT5T)
-    meas_type = ""
-    m_meas = re.search(r"(RT\d+T)", filename, re.IGNORECASE)
-    if m_meas:
-        meas_type = m_meas.group(1)
-
-    # 5. Format Temp
-    temp_str = ""
-    if temp is not None:
-        t_val = int(math.ceil(temp))
-        temp_str = f"{t_val}K"
-    
-    # 6. Format Direction
-    dir_str = direction if direction != "unknown" else ""
-    
-    # Combine
-    components = [sample, meas_type, voltage, state, temp_str, dir_str]
-    # Filter empty
-    components = [c for c in components if c]
-    
-    return " ".join(components)
 
 def parse_multivu_content(content: str, filename: str) -> Dict[str, Any]:
     lines = content.splitlines()
@@ -225,20 +275,29 @@ def parse_multivu_content(content: str, filename: str) -> Dict[str, Any]:
     # Create Full DataFrame
     df_full = pd.DataFrame(full_data_rows, columns=cols)
 
-    tempK = parse_temperature_from_filename(filename)
-    if tempK is None and tvals:
-        tempK = float(statistics.median(tvals))
-
-    direction = infer_direction_from_filename(filename)
-    label = generate_smart_label(filename, tempK, direction)
+    # Extract Metadata
+    meta = extract_metadata(filename)
+    
+    # Fallback for Temperature if not in filename
+    if meta['temp'] is None and tvals:
+        meta['temp'] = float(statistics.median(tvals))
+        
+    # Generate Label
+    label = generate_label(meta)
 
     return {
         "id": filename,
         "fileName": filename,
         "label": label,
-        "temperatureK": tempK,
-        "direction": direction,
+        "temperatureK": meta['temp'],
+        "direction": meta['direction'],
         "fieldCol": field_name,
+        "rCol": resist_name,
+        "H_T": H_T,
+        "R": R,
+        "full_df": df_full,
+        "metadata": meta
+    }
         "rCol": resist_name,
         "H_T": H_T,
         "R": R,
@@ -395,7 +454,7 @@ def create_plot_interface(plot_id: str, available_datasets: List[Dict[str, Any]]
         # Row 0: Analysis Mode
         analysis_mode = st.selectbox(
             "Analysis Mode",
-            ["Custom Columns", "Standard MR Analysis"],
+            ["Custom Columns", "Standard MR Analysis", "Standard R-T Analysis"],
             index=0,
             key=f"mode_{plot_id}"
         )
@@ -433,6 +492,16 @@ def create_plot_interface(plot_id: str, available_datasets: List[Dict[str, Any]]
                     index=0,
                     key=f"x_unit_{plot_id}"
                 )
+        elif analysis_mode == "Standard R-T Analysis":
+            with c1:
+                y_axis_mode = st.selectbox(
+                    "Y-Axis Mode",
+                    ["Resistance (Ω)", "Normalized (R/R_300K)", "Derivative (dR/dT)"],
+                    index=0,
+                    key=f"y_mode_{plot_id}"
+                )
+            with c2:
+                st.info("X-Axis: Temperature (K)")
         else:
             # Custom Columns Mode
             # Get columns from the first available dataset as reference
@@ -472,12 +541,18 @@ def create_plot_interface(plot_id: str, available_datasets: List[Dict[str, Any]]
             if analysis_mode == "Standard MR Analysis":
                 symmetrize = st.toggle("Symmetrize Data", value=False, key=f"sym_{plot_id}", help="R(H) = (R(H) + R(-H))/2")
                 plot_derivative = False
+                show_linear_fit = False
+            elif analysis_mode == "Standard R-T Analysis":
+                symmetrize = False
+                plot_derivative = False
+                show_linear_fit = False
             else:
                 symmetrize = False
                 plot_derivative = st.toggle("Plot Derivative (dY/dX)", value=False, key=f"deriv_{plot_id}", help="Plot dY/dX vs X")
+                show_linear_fit = st.toggle("Show Linear Fit", value=False, key=f"fit_{plot_id}", help="Fit Y = aX + b")
 
         # File Selector (Multiselect) - Only show if not already shown in Custom Mode
-        if analysis_mode == "Standard MR Analysis":
+        if analysis_mode != "Custom Columns":
             options = [d['label'] for d in available_datasets]
             default_sel = [] # Default to empty selection
             selected_labels = st.multiselect(f"Select Curves for Plot {plot_id}", options, default=default_sel, key=f"sel_{plot_id}")
@@ -648,6 +723,50 @@ def create_plot_interface(plot_id: str, available_datasets: List[Dict[str, Any]]
                     # Remove first NaN
                     y_data = y_data.fillna(0)
             
+            elif analysis_mode == "Standard R-T Analysis":
+                if 'full_df' not in d:
+                    st.warning(f"Full data not available for {d['label']}")
+                    continue
+                
+                full_df = d['full_df']
+                cols = full_df.columns.tolist()
+                temp_idx = choose_temperature_column(cols)
+                
+                if temp_idx < 0:
+                    st.warning(f"No Temperature column found in {d['label']}")
+                    continue
+                    
+                temp_col = cols[temp_idx]
+                
+                # Use the resistance column identified during parsing
+                r_col = d['rCol']
+                if r_col not in full_df.columns:
+                    st.warning(f"Resistance column '{r_col}' not found in {d['label']}")
+                    continue
+                
+                # Create working DF
+                df = pd.DataFrame({"T": full_df[temp_col], "R": full_df[r_col]})
+                df = df.dropna().sort_values("T")
+                
+                x_data = df["T"]
+                x_label = "Temperature (K)"
+                
+                if y_axis_mode == "Resistance (Ω)":
+                    y_data = df["R"]
+                    y_label = "Resistance (Ω)"
+                elif y_axis_mode == "Normalized (R/R_300K)":
+                    # Find R at closest T to 300K
+                    idx_300 = (df["T"] - 300).abs().idxmin()
+                    r_300 = df.loc[idx_300, "R"]
+                    y_data = df["R"] / r_300
+                    y_label = "R / R(300K)"
+                elif y_axis_mode == "Derivative (dR/dT)":
+                    dy = df["R"].diff()
+                    dx = df["T"].diff()
+                    y_data = dy / dx
+                    y_label = "dR/dT (Ω/K)"
+                    y_data = y_data.fillna(0)
+
             else:
                 # Custom Columns Mode
                 if 'full_df' not in d:
@@ -727,6 +846,37 @@ def create_plot_interface(plot_id: str, available_datasets: List[Dict[str, Any]]
                 marker=dict(size=marker_size) if "Markers" in plot_mode else None
             ))
             
+            # Linear Fit
+            if show_linear_fit and x_data is not None and y_data is not None:
+                # Remove NaNs for fitting
+                mask_fit = x_data.notna() & y_data.notna()
+                xf = x_data[mask_fit]
+                yf = y_data[mask_fit]
+                
+                if len(xf) > 1:
+                    # Polyfit degree 1
+                    slope, intercept = np.polyfit(xf, yf, 1)
+                    y_fit = slope * xf + intercept
+                    
+                    fig.add_trace(go.Scatter(
+                        x=xf,
+                        y=y_fit,
+                        mode='lines',
+                        name=f"Fit {legend_name}",
+                        line=dict(dash='dash', width=1),
+                        hoverinfo='skip'
+                    ))
+                    
+                    # Add annotation
+                    # Place it near the end of the line
+                    fig.add_annotation(
+                        x=xf.iloc[-1],
+                        y=y_fit.iloc[-1],
+                        text=f"y = {slope:.2e}x + {intercept:.2e}",
+                        showarrow=True,
+                        arrowhead=1
+                    )
+
             # Add to export
             # Use a simpler key for Origin compatibility (no spaces if possible, but Origin handles them)
             # We'll use a structured key to parse later if needed, or just clean names
