@@ -417,15 +417,19 @@ def delete_file_callback(file_id):
     st.session_state.all_datasets = [d for d in st.session_state.all_datasets if d['id'] != file_id]
     
     # Clean up selections in plots
-    if file_to_delete:
-        for key in list(st.session_state.keys()):
-            if key.startswith("sel_"):
-                # This is a multiselect key, value is a list of filenames
-                current_selection = st.session_state[key]
-                if isinstance(current_selection, list) and file_to_delete in current_selection:
-                    # Create a new list to ensure state update is detected
+    # Iterate over ALL keys to find selections
+    for key in list(st.session_state.keys()):
+        if key.startswith("sel_"):
+            current_selection = st.session_state[key]
+            if isinstance(current_selection, list):
+                # Filter out the deleted file if it exists
+                if file_to_delete:
                     new_selection = [f for f in current_selection if f != file_to_delete]
-                    st.session_state[key] = new_selection
+                else:
+                    new_selection = current_selection
+                
+                # Explicitly update session state to ensure consistency
+                st.session_state[key] = new_selection
 
 def delete_batch_callback(batch_id):
     # Delete files in the batch
