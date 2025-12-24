@@ -968,7 +968,7 @@ if datasets or batches:
 
     # Display "File by file" first if it exists
     if 0 in batches:
-        with st.sidebar.expander(batches[0]['name'], expanded=True):
+        with st.sidebar.expander(batches[0]['name'], expanded=False):
             for d in batches[0]['files']:
                 c_name, c_act = st.columns([0.85, 0.15])
                 with c_name:
@@ -981,7 +981,7 @@ if datasets or batches:
         if bid == 0: continue
         
         b_name = batches[bid]['name']
-        with st.sidebar.expander(b_name, expanded=True):
+        with st.sidebar.expander(b_name, expanded=False):
             # Rename Feature
             col_ren, col_del = st.columns([0.85, 0.15])
             with col_ren:
@@ -1001,8 +1001,7 @@ if datasets or batches:
     st.sidebar.markdown("---")
     st.sidebar.markdown("""
 **Author :** Amir MEDDAS  
-*LPS - Laboratoire de Physique des Solides*
-                        
+*LPS - Laboratoire de Physique des Solides*                                              
 *C2N - Centre de Nanosciences et de Nanotechnologies*    
 [![LinkedIn](https://img.shields.io/badge/LinkedIn-0077B5?style=for-the-badge&logo=linkedin&logoColor=white)](https://www.linkedin.com/in/amir-meddas-80876424b/)
 """)
@@ -1012,8 +1011,7 @@ else:
     st.sidebar.markdown("---")
     st.sidebar.markdown("""
 **Author :** Amir MEDDAS  
-*LPS - Laboratoire de Physique des Solides*
-                        
+*LPS - Laboratoire de Physique des Solides*                                                                
 *C2N - Centre de Nanosciences et de Nanotechnologies*  
 [![LinkedIn](https://img.shields.io/badge/LinkedIn-0077B5?style=for-the-badge&logo=linkedin&logoColor=white)](https://www.linkedin.com/in/amir-meddas-80876424b/)
 """)
@@ -1375,14 +1373,43 @@ def create_plot_interface(plot_id: str, available_datasets: List[Dict[str, Any]]
             show_parabolic_fit = persistent_input(st.toggle, f"pfit_{plot_id}", label="Parabolic Fit", value=False, help="Fit Y = aX² + bX + c")
             
         with c_proc:
+            symmetrize_files = []
             if analysis_mode in ["Standard MR Analysis", "Standard R-H Analysis"]:
-                symmetrize = persistent_input(st.toggle, f"sym_{plot_id}", label="Symmetrize", value=False, help="Fold all data to positive field (|H|) and mirror to create a symmetric loop using all points.")
+                with st.popover("🪞 Symmetrize"):
+                    st.markdown("Select files to symmetrize:")
+                    # Create options map: ID -> Filename
+                    sym_options = {d['id']: d['fileName'] for d in selected_datasets}
+                    
+                    # Persistent Multiselect for Symmetrization
+                    sym_key = f"sym_files_{plot_id}"
+                    if 'persistent_values' not in st.session_state:
+                        st.session_state['persistent_values'] = {}
+                    
+                    # Load saved selection
+                    saved_sym = st.session_state['persistent_values'].get(sym_key, [])
+                    # Filter to keep only valid IDs (currently selected in plot)
+                    valid_sym = [sid for sid in saved_sym if sid in sym_options]
+                    
+                    selected_sym_ids = st.multiselect(
+                        "Files",
+                        options=list(sym_options.keys()),
+                        format_func=lambda x: sym_options[x],
+                        default=valid_sym,
+                        key=f"widget_sym_{plot_id}_{st.session_state.uploader_key}",
+                        label_visibility="collapsed"
+                    )
+                    
+                    # Save selection
+                    if st.session_state['persistent_values'].get(sym_key) != selected_sym_ids:
+                        st.session_state['persistent_values'][sym_key] = selected_sym_ids
+                        save_session_state()
+                        
+                    symmetrize_files = selected_sym_ids
+                
                 plot_derivative = False
             elif analysis_mode == "Standard R-T Analysis":
-                symmetrize = False
                 plot_derivative = False
             else:
-                symmetrize = False
                 plot_derivative = persistent_input(st.toggle, f"deriv_{plot_id}", label="Derivative", value=False, help="Plot dY/dX vs X")
 
         # Fit Settings (Conditional)
@@ -1509,7 +1536,8 @@ def create_plot_interface(plot_id: str, available_datasets: List[Dict[str, Any]]
                 # List of dataframes to process: (df, suffix)
                 dfs_to_process = [(df_base, "")]
                 
-                if symmetrize:
+                # Check if this specific file is selected for symmetrization
+                if d['id'] in symmetrize_files:
                     # Simple Mirror Logic: (H, R) -> (-H, R)
                     # Plots the symmetric of the curve with respect to the Y-axis
                     df_sym = df_base.copy()
