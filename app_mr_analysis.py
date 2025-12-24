@@ -1515,7 +1515,8 @@ def create_plot_interface(plot_id: str, available_datasets: List[Dict[str, Any]]
                     df_sym["H_T"] = df_sym["H_T"].abs()
                     
                     # Average data with same H (to remove hysteresis/oscillations)
-                    df_sym["H_round"] = df_sym["H_T"].round(5) 
+                    # Use coarser rounding (3 decimals = 1mT) to ensure up/down sweeps are merged
+                    df_sym["H_round"] = df_sym["H_T"].round(3) 
                     df_sym = df_sym.groupby("H_round", as_index=False).mean()
                     df_sym = df_sym.drop(columns=["H_round"])
                     
