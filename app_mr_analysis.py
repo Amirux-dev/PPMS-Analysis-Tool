@@ -390,6 +390,32 @@ def persistent_input(widget_func, persistent_key, **kwargs):
     store[persistent_key] = val
     return val
 
+def recover_session_state():
+    """Recover plot_ids and next_plot_id from persistent_values if they seem lost."""
+    if 'persistent_values' not in st.session_state:
+        return
+
+    store = st.session_state.persistent_values
+    # Start with current plot_ids or default [1]
+    recovered_ids = set(st.session_state.get('plot_ids', [1]))
+    
+    # Scan store for keys like 'fit_{id}_...' to find lost plots
+    for key in store.keys():
+        if key.startswith("fit_"):
+            parts = key.split("_")
+            # fit_{id}_{param} - check if second part is a digit (plot_id)
+            if len(parts) > 1 and parts[1].isdigit():
+                pid = int(parts[1])
+                recovered_ids.add(pid)
+    
+    # Update plot_ids if we found more
+    st.session_state.plot_ids = sorted(list(recovered_ids))
+    
+    # Update next_plot_id to be safe
+    current_max = max(st.session_state.plot_ids) if st.session_state.plot_ids else 0
+    if st.session_state.get('next_plot_id', 1) <= current_max:
+        st.session_state.next_plot_id = current_max + 1
+
 def init_session_state():
     """Initialize all session state variables."""
     defaults = {
@@ -406,6 +432,7 @@ def init_session_state():
             st.session_state[key] = value
 
 init_session_state()
+recover_session_state()
 
 # Ensure Unique IDs for all datasets (Migration/Safety check)
 seen_ids = set()
@@ -1133,7 +1160,7 @@ def create_plot_interface(plot_id: str, available_datasets: List[Dict[str, Any]]
         custom_x_col = None
         custom_y_col = None
         
-        if analysis_mode == "Standard MR Analysis":
+        if analysis_mode in ["Standard MR Analysis", "Standard R-H Analysis"]:
             # R0 Method
             r0_method = persistent_selectbox(
                 "R0 Calculation Method",
@@ -1146,9 +1173,14 @@ def create_plot_interface(plot_id: str, available_datasets: List[Dict[str, Any]]
                 r0_window = st.number_input("Zero Field Window (T)", value=0.01, step=0.005, format="%.4f", key=f"r0_win_{plot_id}")
 
             with c1:
+                if analysis_mode == "Standard MR Analysis":
+                    y_opts = ["Magnetoresistance (MR %)", "Resistance (Ω)", "Normalized (R/R0)", "Derivative (dR/dH)"]
+                else:
+                    y_opts = ["Resistance (Ω)", "Normalized (R/R0)", "Derivative (dR/dH)"]
+
                 y_axis_mode = persistent_selectbox(
                     "Y-Axis Mode",
-                    ["Magnetoresistance (MR %)", "Resistance (Ω)", "Normalized (R/R0)", "Derivative (dR/dH)"],
+                    y_opts,
                     index=0,
                     persistent_key=f"y_mode_{plot_id}"
                 )
@@ -1374,9 +1406,9 @@ def create_plot_interface(plot_id: str, available_datasets: List[Dict[str, Any]]
                         # Fallback if no positive data
                         st.warning(f"Cannot symmetrize {d['fileName']}: No positive field data found.")
 
-                # Calculate R0 (Only for MR Analysis)
+                # Calculate R0 (For MR and R-H Analysis)
                 r0 = 1.0
-                if analysis_mode == "Standard MR Analysis":
+                if analysis_mode in ["Standard MR Analysis", "Standard R-H Analysis"]:
                     if r0_method == "First Point":
                         r0 = df["R"].iloc[0]
                     elif r0_method == "Closest to 0T":
@@ -1419,8 +1451,18 @@ def create_plot_interface(plot_id: str, available_datasets: List[Dict[str, Any]]
                         y_data = df["R"]
                         y_label = "Resistance (Ω)"
                 else: # Standard R-H Analysis
-                    y_data = df["R"]
-                    y_label = "Resistance (Ω)"
+                    if y_axis_mode == "Normalized (R/R0)":
+                        y_data = df["R"] / r0
+                        y_label = "R / R0"
+                    elif y_axis_mode == "Derivative (dR/dH)":
+                        dy = df["R"].diff()
+                        dx = df["H_T"].diff()
+                        y_data = dy / dx
+                        y_label = "dR/dH (Ω/T)"
+                        y_data = y_data.fillna(0)
+                    else: # Resistance
+                        y_data = df["R"]
+                        y_label = "Resistance (Ω)"
             
             elif analysis_mode == "Standard R-T Analysis":
                 if 'full_df' not in d:
