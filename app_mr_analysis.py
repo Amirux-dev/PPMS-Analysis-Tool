@@ -261,16 +261,18 @@ st.sidebar.header("📂 Data Manager")
 if 'all_datasets' not in st.session_state:
     st.session_state.all_datasets = []
 
-# File Uploader
-uploaded_files = st.sidebar.file_uploader(
-    "Upload .dat files or folders", 
-    type=["dat"], 
-    accept_multiple_files=True,
-    help="Drag and drop files or folders here. They will be added to your session."
-)
+# File Uploader (Wrapped in a form to clear after upload)
+with st.sidebar.form("upload_form", clear_on_submit=True):
+    uploaded_files = st.file_uploader(
+        "Upload .dat files", 
+        type=["dat"], 
+        accept_multiple_files=True,
+        help="Drag and drop files here. Click 'Add Data' to process them."
+    )
+    submitted = st.form_submit_button("Add Data")
 
 # Process Uploaded Files
-if uploaded_files:
+if submitted and uploaded_files:
     new_files_count = 0
     for uploaded_file in uploaded_files:
         # Check if file already loaded to avoid duplicates
@@ -287,15 +289,13 @@ if uploaded_files:
     
     if new_files_count > 0:
         st.sidebar.success(f"Added {new_files_count} new files.")
+        st.rerun() # Rerun to update the list immediately
 
 # Data Management & Explorer
 datasets = st.session_state.all_datasets
 
 if datasets:
-    # Sort datasets
-    datasets.sort(key=lambda d: (d['temperatureK'] if d['temperatureK'] is not None else 9999, d['fileName']))
-
-    # Ensure unique labels
+    # Ensure unique labels (but preserve order)
     label_counts = {}
     for d in datasets:
         l = d['label']
@@ -316,18 +316,10 @@ if datasets:
             st.session_state.all_datasets = []
             st.rerun()
 
-    # Group by Sample (First word of label)
-    files_by_sample = {}
-    for d in datasets:
-        sample = d['label'].split()[0]
-        if sample not in files_by_sample:
-            files_by_sample[sample] = []
-        files_by_sample[sample].append(d)
-
-    for sample, sample_datasets in files_by_sample.items():
-        with st.sidebar.expander(f"📁 {sample} ({len(sample_datasets)})"):
-            for d in sample_datasets:
-                st.text(f"📄 {d['fileName']}")
+    # List files in original order (No sorting, No grouping)
+    with st.sidebar.expander("📁 Loaded Files", expanded=True):
+        for d in datasets:
+            st.text(f"📄 {d['fileName']}")
     
     st.sidebar.caption("⚠️ Refreshing the page will clear the data.")
 
