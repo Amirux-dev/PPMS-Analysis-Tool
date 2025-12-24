@@ -15,12 +15,25 @@ from typing import List, Dict, Any, Optional, Tuple
 # Set page config to wide mode by default
 st.set_page_config(layout="wide", page_title="PPMS Analysis Tool")
 
-# Inject CSS for Left-Aligned Popover Buttons
+# Inject CSS for Centered Headers (Expander & Popover)
 st.markdown("""
 <style>
+    /* Center Popover Buttons */
     div[data-testid="stPopover"] > button {
-        justify-content: start;
-        text-align: left;
+        justify-content: center;
+        text-align: center;
+        width: 100%;
+    }
+    /* Center Expander Headers */
+    div[data-testid="stExpander"] summary p {
+        text-align: center;
+        width: 100%;
+        font-size: 1rem;
+        font-weight: 600;
+    }
+    /* Adjust arrow position if needed (optional) */
+    div[data-testid="stExpander"] summary {
+        justify-content: center; 
     }
 </style>
 """, unsafe_allow_html=True)
@@ -1052,7 +1065,7 @@ def create_plot_interface(plot_id: str, available_datasets: List[Dict[str, Any]]
                 custom_legends[d['id']] = custom_leg
 
         # --- Customization ---
-        with st.popover("🎨 Plot Customization", width='stretch'):
+        with st.expander("🎨 Plot Customization", expanded=False):
             # Row 1: Titles & Theme
             col_cust1, col_cust2, col_cust3 = st.columns(3)
             with col_cust1:
