@@ -12,14 +12,13 @@ import os
 import uuid
 from typing import List, Dict, Any, Optional, Tuple
 
-
 # -----------------------------------------------------------------------------
-# PARSING LOGIC (Adapted from original script)
+# DATA PARSING & EXTRACTION
 # -----------------------------------------------------------------------------
 
 def extract_metadata(filename: str) -> Dict[str, Any]:
     """
-    Extracts metadata (Sample, Temp, Field, State, etc.) from the filename using robust regex patterns.
+    Extracts metadata (Sample, Temp, Field, State, etc.) from the filename.
     """
     meta = {
         "sample": "Sample",
@@ -33,23 +32,21 @@ def extract_metadata(filename: str) -> Dict[str, Any]:
     
     name_clean = filename.replace(".dat", "")
     
-    # 1. Sample Name (First alphanumeric block)
+    # 1. Sample Name
     parts = re.split(r'[_\s]+', name_clean)
     if parts and parts[0]:
         meta["sample"] = parts[0]
         
-    # Specific overrides for common samples (optional)
+    # Sample overrides
     if "SRO" in name_clean.upper() and meta["sample"] == "Sample": meta["sample"] = "SrRuO3"
     if "STO" in name_clean.upper() and meta["sample"] == "Sample": meta["sample"] = "SrTiO3"
 
     # 2. Temperature
-    # Matches: 300K, 10.5K, 5 K, T=5K
     m_temp = re.search(r"(?:T=)?(\d+(?:\.\d+)?)\s*K", name_clean, re.IGNORECASE)
     if m_temp:
         meta["temp"] = float(m_temp.group(1))
 
     # 3. Magnetic Field
-    # Matches: 9T, 0.5T, 1000Oe, 9Tesla
     m_field = re.search(r"(\d+(?:\.\d+)?)\s*(T|Oe|Tesla)", name_clean, re.IGNORECASE)
     if m_field:
         val = float(m_field.group(1))
@@ -79,7 +76,7 @@ def extract_metadata(filename: str) -> Dict[str, Any]:
     elif re.search(r"DOWN|DN", name_clean, re.IGNORECASE):
         meta["direction"] = "DOWN"
         
-    # 7. Measurement Type (RT, RH, IV)
+    # 7. Measurement Type
     if re.search(r"RT", name_clean, re.IGNORECASE):
         meta["meas_type"] = "RT"
     elif re.search(r"RH", name_clean, re.IGNORECASE):
@@ -302,12 +299,11 @@ def parse_multivu_content(content: str, filename: str) -> Dict[str, Any]:
     }
 
 # -----------------------------------------------------------------------------
-# STREAMLIT APP
+# STREAMLIT APPLICATION
 # -----------------------------------------------------------------------------
 
 st.set_page_config(page_title="PPMS Analysis Tool", layout="wide")
 
-# --- State Initialization ---
 def init_session_state():
     """Initialize all session state variables."""
     defaults = {
@@ -325,11 +321,9 @@ def init_session_state():
 
 init_session_state()
 
-# --- Migration: Ensure Unique IDs ---
-# Fixes DuplicateWidgetID errors by ensuring all datasets have a unique UUID
+# Ensure Unique IDs for all datasets (Migration/Safety check)
 seen_ids = set()
 for d in st.session_state.all_datasets:
-    # If ID is missing, or is a filename (heuristic: ends with .dat), or is duplicate
     if 'id' not in d or str(d['id']).lower().endswith('.dat') or d['id'] in seen_ids:
         d['id'] = str(uuid.uuid4())
     seen_ids.add(d['id'])
@@ -340,30 +334,27 @@ st.markdown("Upload `.dat` files to visualize and analyze transport measurements
 # --- Sidebar: Data Manager ---
 st.sidebar.header("Data Manager")
 
-# File Uploader (Automatic)
+# File Uploader
 uploaded_files = st.sidebar.file_uploader(
     "Upload .dat files", 
     type=["dat"], 
     accept_multiple_files=True,
     key=f"uploader_{st.session_state.uploader_key}",
-    help="Drag and drop files or folders here. They will be automatically processed."
+    help="Drag and drop files or folders here."
 )
 
-# Process Uploaded Files Automatically
+# Process Uploaded Files
 if uploaded_files:
-    # Determine Batch Type
     is_batch = len(uploaded_files) > 1
     
     if is_batch:
         st.session_state.batch_counter += 1
         batch_id = st.session_state.batch_counter
         
-        # Attempt to guess folder name from common prefix
+        # Guess folder name from prefix
         filenames = [f.name for f in uploaded_files]
         prefix = os.path.commonprefix(filenames)
         
-        # Clean prefix (remove trailing separators or numbers if it looks like a file sequence)
-        # e.g. "SRO_1.dat", "SRO_2.dat" -> "SRO_"
         if prefix:
             batch_name = f"📂 {prefix.strip('_- ')}"
         else:
@@ -374,7 +365,6 @@ if uploaded_files:
     
     new_files_count = 0
     for uploaded_file in uploaded_files:
-        # Check if file already loaded to avoid duplicates
         if any(d['fileName'] == uploaded_file.name for d in st.session_state.all_datasets):
             continue
             
@@ -382,7 +372,6 @@ if uploaded_files:
             content = uploaded_file.getvalue().decode("utf-8", errors="ignore")
             data = parse_multivu_content(content, uploaded_file.name)
             
-            # Add Batch Info
             data['batch_id'] = batch_id
             data['batch_name'] = batch_name 
             
@@ -393,16 +382,13 @@ if uploaded_files:
     
     if new_files_count > 0:
         st.sidebar.success(f"Added {new_files_count} new files.")
-        
-        # Increment key to clear uploader
         st.session_state.uploader_key += 1
         st.rerun()
 
-# Folder Management Actions
-# (Always active now, no checkbox)
+# Folder Management
 organize_mode = True
 
-# Callbacks for File Management
+# --- Callbacks ---
 def create_folder_callback():
     new_name = st.session_state.get("new_folder_name_input", "New Folder")
     st.session_state.batch_counter += 1
@@ -415,8 +401,7 @@ def move_file_callback(file_id, target_bid, target_name):
             d['batch_name'] = target_name
             break
     
-    # Force refresh of selection state to prevent resets
-    # This ensures Streamlit acknowledges the existing selection even after data modification
+    # Force refresh of selection state
     for key in list(st.session_state.keys()):
         if key.startswith("sel_"):
             if isinstance(st.session_state[key], list):
@@ -434,18 +419,14 @@ def delete_file_callback(file_id):
     st.session_state.all_datasets = [d for d in st.session_state.all_datasets if d['id'] != file_id]
     
     # Clean up selections in plots
-    # Iterate over ALL keys to find selections
     for key in list(st.session_state.keys()):
         if key.startswith("sel_"):
             current_selection = st.session_state[key]
             if isinstance(current_selection, list):
-                # Filter out the deleted file if it exists
                 if file_to_delete:
                     new_selection = [f for f in current_selection if f != file_to_delete]
                 else:
                     new_selection = current_selection
-                
-                # Explicitly update session state to ensure consistency
                 st.session_state[key] = new_selection
 
 def delete_batch_callback(batch_id):
@@ -470,7 +451,6 @@ def move_files_batch_callback(file_ids, target_bid, target_name):
 
 def delete_files_batch_callback(file_ids):
     """Delete multiple files."""
-    # Identify filenames to remove from selections
     files_to_delete = [d['fileName'] for d in st.session_state.all_datasets if d['id'] in file_ids]
     
     # Remove from dataset
@@ -485,15 +465,13 @@ def delete_files_batch_callback(file_ids):
                 st.session_state[key] = new_selection
 
 # Create New Folder UI
-with st.sidebar.popover("➕ Create New Folder", use_container_width=True):
+with st.sidebar.popover("➕ Create New Folder", width='stretch'):
     st.text_input("Folder Name", "New Folder", key="new_folder_name_input")
-    st.button("Create", use_container_width=True, on_click=create_folder_callback)
+    st.button("Create", width='stretch', on_click=create_folder_callback)
 
 def rename_batch_callback(batch_id, old_name):
-    # Get new name from session state widget
     new_name = st.session_state.get(f"rename_{batch_id}")
     
-    # Basic validation
     if not new_name or new_name == old_name:
         return
 
@@ -506,15 +484,13 @@ def rename_batch_callback(batch_id, old_name):
     if 'custom_batches' in st.session_state and batch_id in st.session_state.custom_batches:
         st.session_state.custom_batches[batch_id] = new_name
         
-    # Update Plot Filters (Preserve selection if filtering by this folder)
+    # Update Plot Filters
     for key in list(st.session_state.keys()):
         if key.startswith("batch_filter_") or key.startswith("batch_filter_cust_"):
             if st.session_state[key] == old_name:
                 st.session_state[key] = new_name
 
-# --- Dialog Definition for File Management ---
-# Using st.dialog (or experimental_dialog) to create a modal for file actions.
-# This avoids the "sticky popover" issue where the menu stays open on the wrong file after deletion.
+# --- Dialogs for File Management ---
 dialog_decorator = None
 if hasattr(st, "dialog"):
     dialog_decorator = st.dialog
@@ -529,10 +505,8 @@ if dialog_decorator:
         st.markdown("---")
         st.subheader("Move File")
         
-        # Filter options: exclude current batch
         target_options = {bid: info['name'] for bid, info in all_batches_info.items() if bid != current_batch_id}
         
-        # Ensure "File by file" (0) is available if we are in a batch
         if current_batch_id != 0:
              target_options[0] = "📄 File by file import"
         
@@ -612,17 +586,15 @@ def render_file_actions(file_data: Dict[str, Any], current_batch_id: int, all_ba
     # Ensure ID is a string
     file_id = str(file_data.get('id', uuid.uuid4()))
     
-    # Use a Dialog if available (Robust against sticky state)
+    # Use a Dialog if available
     if dialog_decorator:
         if st.button("⚙️", key=f"btn_manage_{file_id}", help="Manage File"):
             manage_file_dialog(file_data, current_batch_id, all_batches_info)
     else:
-        # Fallback for older Streamlit versions (might have sticky bug)
-        # Note: Removed 'key' parameter from st.popover as it seems to cause TypeError in the user's environment
+        # Fallback for older Streamlit versions
         with st.popover("⋮", help="Manage File"):
             st.markdown("**Move File**")
             
-            # Filter options: exclude current batch
             target_options = {bid: info['name'] for bid, info in all_batches_info.items() if bid != current_batch_id}
             
             # Ensure "File by file" (0) is available if we are in a batch
@@ -644,7 +616,7 @@ def render_file_actions(file_data: Dict[str, Any], current_batch_id: int, all_ba
                     st.button(
                         "Move", 
                         key=f"mv_btn_{file_id}", 
-                        use_container_width=True, 
+                        width='stretch', 
                         on_click=move_file_callback, 
                         args=(file_data['id'], target_bid, target_name)
                     )
@@ -656,7 +628,7 @@ def render_file_actions(file_data: Dict[str, Any], current_batch_id: int, all_ba
                 "Delete File", 
                 key=f"rm_{file_id}", 
                 type="primary", 
-                use_container_width=True, 
+                width='stretch', 
                 on_click=delete_file_callback, 
                 args=(file_data['id'],)
             )
@@ -664,7 +636,7 @@ def render_file_actions(file_data: Dict[str, Any], current_batch_id: int, all_ba
 # Data Management & Explorer
 datasets = st.session_state.all_datasets
 
-# Group by Batch (Logic moved up to handle empty state)
+# Group by Batch
 batches = {}
 batch_order = []
 
@@ -690,7 +662,7 @@ if 'custom_batches' in st.session_state:
             batch_order.append(bid)
 
 if datasets or batches:
-    # Ensure unique labels (but preserve order)
+    # Ensure unique labels
     label_counts = {}
     for d in datasets:
         l = d['label']
@@ -704,12 +676,12 @@ if datasets or batches:
     # Explorer UI
     st.sidebar.markdown("### Loaded Data")
     
-    # Clear All Button (Right Aligned)
+    # Clear All Button
     c_info, c_clear = st.sidebar.columns([0.4, 0.6])
     with c_info:
         st.write(f"**Total Files:** {len(datasets)}")
     with c_clear:
-        if st.button("🗑️ Clear All", help="Remove all loaded data", use_container_width=True):
+        if st.button("🗑️ Clear All", help="Remove all loaded data", width='stretch'):
             st.session_state.all_datasets = []
             st.session_state.batch_counter = 0
             st.session_state.custom_batches = {}
@@ -717,13 +689,12 @@ if datasets or batches:
 
     # --- Batch Actions Button ---
     if dialog_decorator:
-        if st.sidebar.button("⚡ Batch Actions", use_container_width=True):
+        if st.sidebar.button("⚡ Batch Actions", width='stretch'):
             manage_batch_dialog(datasets, batches)
     else:
-        # Fallback for older versions: Expander
+        # Fallback for older versions
         with st.sidebar.expander("⚡ Batch Actions", expanded=False):
             # 1. Select Files
-            # Create a mapping of ID -> Display Name
             file_options = {d['id']: f"{d['fileName']} ({d.get('batch_name', 'Unknown')})" for d in datasets}
             
             selected_ids = st.multiselect(
@@ -739,9 +710,7 @@ if datasets or batches:
                 # Move Action
                 st.caption("Move Selected")
                 
-                # Target options (All folders)
                 target_options = {bid: info['name'] for bid, info in batches.items()}
-                # Ensure "File by file" is available
                 if 0 not in target_options:
                      target_options[0] = "📄 File by file import"
                      
@@ -759,15 +728,15 @@ if datasets or batches:
                     st.button(
                         "Move", 
                         key="batch_move_btn", 
-                        use_container_width=True, 
+                        width='stretch', 
                         on_click=move_files_batch_callback, 
                         args=(selected_ids, target_bid, target_name)
                     )
                     
                 st.markdown("---")
                 # Delete Action
-                if st.button(f"Delete {len(selected_ids)} Files", key="batch_delete_btn", type="primary", use_container_width=True, on_click=delete_files_batch_callback, args=(selected_ids,)):
-                    pass # Callback handles it
+                if st.button(f"Delete {len(selected_ids)} Files", key="batch_delete_btn", type="primary", width='stretch', on_click=delete_files_batch_callback, args=(selected_ids,)):
+                    pass
             else:
                 st.caption("Select files to see actions.")
 
@@ -806,7 +775,7 @@ if datasets or batches:
     st.sidebar.markdown("---")
     st.sidebar.markdown("""
 **Author :** Amir MEDDAS  
-**LPS - Laboratoire de Physique des Solides*
+*LPS - Laboratoire de Physique des Solides*
 *C2N - Centre de Nanosciences et de Nanotechnologies*    
 [![LinkedIn](https://img.shields.io/badge/LinkedIn-0077B5?style=for-the-badge&logo=linkedin&logoColor=white)](https://www.linkedin.com/in/amir-meddas-80876424b/)
 """)
@@ -816,8 +785,8 @@ else:
     st.sidebar.markdown("---")
     st.sidebar.markdown("""
 **Author:** Amir MEDDAS  
+*LPS - Laboratoire de Physique des Solides*                          
 *C2N - Centre de Nanosciences et de Nanotechnologies*  
-*LPS - Laboratoire de Physique des Solides*  
 [![LinkedIn](https://img.shields.io/badge/LinkedIn-0077B5?style=for-the-badge&logo=linkedin&logoColor=white)](https://www.linkedin.com/in/amir-meddas-80876424b/)
 """)
     st.stop()
@@ -887,25 +856,24 @@ def create_plot_interface(plot_id: str, available_datasets: List[Dict[str, Any]]
         c_head_title, c_head_actions = st.columns([0.7, 0.3], vertical_alignment="center")
         
         with c_head_title:
-            # Editable Plot Name (Styled as Header)
+            # Editable Plot Name
             c_h_text, c_h_edit = st.columns([0.8, 0.2], vertical_alignment="center")
             with c_h_text:
                 plot_name = st.session_state.get(f"pname_{plot_id}", f"Plot {plot_id}")
-                # Use HTML to control margins and style
                 st.markdown(f"<h3 style='margin: 0; padding: 0; line-height: 1.5;'>{plot_name}</h3>", unsafe_allow_html=True)
             with c_h_edit:
-                with st.popover("✏️", help="Rename Plot", use_container_width=True):
+                with st.popover("✏️", help="Rename Plot", width='stretch'):
                     st.text_input("Name", value=plot_name, key=f"pname_{plot_id}")
         
         with c_head_actions:
-            # Action Buttons (Add, Remove, Duplicate)
+            # Action Buttons
             b_add, b_rem, b_dup = st.columns(3)
             with b_add:
-                st.button("➕", key=f"add_btn_{plot_id}", help="Add a new plot", on_click=add_plot_callback, use_container_width=True)
+                st.button("➕", key=f"add_btn_{plot_id}", help="Add a new plot", on_click=add_plot_callback, width='stretch')
             with b_rem:
-                st.button("➖", key=f"del_btn_{plot_id}", help="Remove this plot", on_click=remove_plot_callback, args=(plot_id,), use_container_width=True)
+                st.button("➖", key=f"del_btn_{plot_id}", help="Remove this plot", on_click=remove_plot_callback, args=(plot_id,), width='stretch')
             with b_dup:
-                st.button("📋", key=f"dup_{plot_id}", help="Duplicate this plot", on_click=duplicate_plot_callback, args=(plot_id,), use_container_width=True)
+                st.button("📋", key=f"dup_{plot_id}", help="Duplicate this plot", on_click=duplicate_plot_callback, args=(plot_id,), width='stretch')
         
         # Row 0: Analysis Mode
         analysis_mode = st.selectbox(
@@ -915,11 +883,11 @@ def create_plot_interface(plot_id: str, available_datasets: List[Dict[str, Any]]
             key=f"mode_{plot_id}"
         )
         
-        # --- Unified File Selection (Moved to Top) ---
+        # --- Unified File Selection ---
         # Filter by Folder (Batch)
         batch_options = get_batch_options(available_datasets, st.session_state.get('custom_batches', {}))
         
-        # Robust Index Calculation: Preserve selection even if options change
+        # Robust Index Calculation
         current_batch_val = st.session_state.get(f"batch_filter_{plot_id}", "All Folders")
         try:
             batch_index = batch_options.index(current_batch_val)
@@ -939,8 +907,7 @@ def create_plot_interface(plot_id: str, available_datasets: List[Dict[str, Any]]
             filtered_datasets = available_datasets
 
         # Use Raw Filenames for Selection
-        # CRITICAL FIX: Options must include currently selected files even if they are filtered out
-        # This prevents selection loss when switching folders
+        # Options must include currently selected files even if they are filtered out
         filtered_filenames = [d['fileName'] for d in filtered_datasets]
         current_selection = st.session_state.get(f"sel_{plot_id}", [])
         
@@ -954,7 +921,7 @@ def create_plot_interface(plot_id: str, available_datasets: List[Dict[str, Any]]
             key=f"sel_{plot_id}"
         )
         
-        # Map back to datasets (look in ALL available datasets)
+        # Map back to datasets
         selected_datasets = [d for d in available_datasets if d['fileName'] in selected_filenames]
         
         # Row 1: Axes & Style
@@ -965,7 +932,7 @@ def create_plot_interface(plot_id: str, available_datasets: List[Dict[str, Any]]
         custom_y_col = None
         
         if analysis_mode == "Standard MR Analysis":
-            # R0 Method (Moved from Global)
+            # R0 Method
             r0_method = st.selectbox(
                 "R0 Calculation Method",
                 ["Closest to 0T", "Mean within Window", "First Point"],
@@ -1002,17 +969,13 @@ def create_plot_interface(plot_id: str, available_datasets: List[Dict[str, Any]]
                 st.info("X-Axis: Temperature (K)")
         else:
             # Custom Columns Mode
-            # Get columns from the first available dataset as reference
             ref_cols = []
             
             if selected_datasets:
-                # Find common non-empty columns or just take from first
-                # Let's take the first one for simplicity but filter for non-empty
                 df_ref = selected_datasets[0]['full_df']
                 valid_cols = df_ref.dropna(axis=1, how='all').columns.tolist()
                 ref_cols = valid_cols
             elif available_datasets:
-                 # Fallback if nothing selected yet
                 df_ref = available_datasets[0]['full_df']
                 valid_cols = df_ref.dropna(axis=1, how='all').columns.tolist()
                 ref_cols = valid_cols
@@ -1025,7 +988,7 @@ def create_plot_interface(plot_id: str, available_datasets: List[Dict[str, Any]]
             # Oe to T conversion
             convert_oe_to_t = st.checkbox("Convert X from Oe to Tesla (x 10^-4)", value=False, key=f"conv_oe_{plot_id}")
 
-        # Row 2: Processing (Smoothing & Symmetrize)
+        # Row 2: Processing
         c4, c5 = st.columns([1, 1], vertical_alignment="bottom")
         with c4:
             smooth_window = st.number_input("Smoothing (pts)", min_value=0, value=0, step=1, key=f"smooth_{plot_id}", help="Moving average window size.")
@@ -1051,10 +1014,7 @@ def create_plot_interface(plot_id: str, available_datasets: List[Dict[str, Any]]
         custom_legends = {}
         with st.expander("🖊️ Legend Labels", expanded=False):
             for d in selected_datasets:
-                # Default legend logic: Use Smart Label
                 default_leg = d['label']
-                
-                # Input
                 custom_leg = st.text_input(f"Label for {d['fileName']}", value=default_leg, key=f"leg_{plot_id}_{d['id']}")
                 custom_legends[d['id']] = custom_leg
 
@@ -1349,7 +1309,6 @@ def create_plot_interface(plot_id: str, available_datasets: List[Dict[str, Any]]
                     ))
                     
                     # Add annotation
-                    # Place it near the end of the line
                     fig.add_annotation(
                         x=xf.iloc[-1],
                         y=y_fit.iloc[-1],
@@ -1359,8 +1318,6 @@ def create_plot_interface(plot_id: str, available_datasets: List[Dict[str, Any]]
                     )
 
             # Add to export
-            # Use a simpler key for Origin compatibility (no spaces if possible, but Origin handles them)
-            # We'll use a structured key to parse later if needed, or just clean names
             clean_label = d['label'].replace(" ", "_")
             export_data[f"{clean_label}_X"] = x_data.values
             export_data[f"{clean_label}_Y"] = y_data.values
@@ -1373,7 +1330,6 @@ def create_plot_interface(plot_id: str, available_datasets: List[Dict[str, Any]]
         # Determine Theme
         final_template = template_mode
         if template_mode == "Auto (Global)":
-            # Use plotly_white as default base, or let user pick specific theme
             final_template = "plotly" 
         
         layout_args = dict(
@@ -1413,11 +1369,11 @@ def create_plot_interface(plot_id: str, available_datasets: List[Dict[str, Any]]
             
         config = {
             'toImageButtonOptions': {
-                'format': 'png', # one of png, svg, jpeg, webp
+                'format': 'png',
                 'filename': f"MR_Analysis_{safe_title}",
                 'height': height,
                 'width': width,
-                'scale': 2 # Higher resolution
+                'scale': 2
             }
         }
 
@@ -1437,7 +1393,7 @@ def create_plot_interface(plot_id: str, available_datasets: List[Dict[str, Any]]
                     data=dat_exp,
                     file_name=f"plot_{plot_id}_data.dat",
                     mime="text/plain",
-                    use_container_width=True
+                    width='stretch'
                 )
         return fig
 
@@ -1453,9 +1409,6 @@ with st.expander("Layout & Export Settings", expanded=True):
     with col_lay3:
         plot_height = st.number_input("Plot Height (px)", min_value=300, value=600)
 
-# Dynamic Plot Management
-# (State initialized at top)
-
 # Render Plots in Grid
 generated_figures = []
 plot_indices = st.session_state.plot_ids
@@ -1470,9 +1423,6 @@ for row_indices in rows:
             fig = create_plot_interface(str(plot_idx), datasets, plot_width, plot_height)
             if fig:
                 generated_figures.append(fig)
-
-# --- Global HTML Export ---
-# (Removed as requested)
 
 # --- Data Table (Global) ---
 with st.expander("View Raw Data Metadata"):
@@ -1507,7 +1457,7 @@ with st.expander("View Raw Data Metadata"):
             if 'full_df' in d:
                 # Filter out completely empty columns
                 df_display = d['full_df'].dropna(axis=1, how='all')
-                st.dataframe(df_display, use_container_width=True, height=300)
+                st.dataframe(df_display, width='stretch', height=300)
             else:
                 st.info("Full dataframe not available.")
         else:
