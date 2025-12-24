@@ -404,6 +404,13 @@ def move_file_callback(file_id, target_bid, target_name):
             d['batch_id'] = target_bid
             d['batch_name'] = target_name
             break
+    
+    # Force refresh of selection state to prevent resets
+    # This ensures Streamlit acknowledges the existing selection even after data modification
+    for key in list(st.session_state.keys()):
+        if key.startswith("sel_"):
+            if isinstance(st.session_state[key], list):
+                st.session_state[key] = list(st.session_state[key])
 
 def delete_file_callback(file_id):
     # Find the file name before deleting
