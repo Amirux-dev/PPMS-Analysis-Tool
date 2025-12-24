@@ -629,6 +629,18 @@ def duplicate_plot_callback(plot_id):
             new_key = key.replace(f"_{plot_id}_", f"_{new_id}_")
             st.session_state[new_key] = st.session_state[key]
 
+def get_batch_options(datasets: List[Dict[str, Any]]) -> List[str]:
+    """Returns a stable list of batch names for dropdowns."""
+    unique_batches = {}
+    for d in datasets:
+        bid = d.get('batch_id', 0)
+        bname = d.get('batch_name', 'Unknown')
+        unique_batches[bid] = bname
+    
+    # Sort by ID for stability
+    sorted_ids = sorted(unique_batches.keys())
+    return ["All Folders"] + [unique_batches[bid] for bid in sorted_ids]
+
 def create_plot_interface(plot_id: str, available_datasets: List[Dict[str, Any]], width: int, height: int) -> Optional[go.Figure]:
     """Creates a self-contained plotting interface and returns the figure."""
     
@@ -716,8 +728,7 @@ def create_plot_interface(plot_id: str, available_datasets: List[Dict[str, Any]]
             # File Selector (Multiselect) - Moved up to determine available columns
             
             # Filter by Folder (Batch)
-            unique_batches = {d.get('batch_id', 0): d.get('batch_name', 'Unknown') for d in available_datasets}
-            batch_options = ["All Folders"] + list(unique_batches.values())
+            batch_options = get_batch_options(available_datasets)
             selected_batch_name = st.selectbox("Filter by Folder", batch_options, index=0, key=f"batch_filter_cust_{plot_id}")
             
             if selected_batch_name != "All Folders":
@@ -772,11 +783,7 @@ def create_plot_interface(plot_id: str, available_datasets: List[Dict[str, Any]]
         # File Selector (Multiselect) - Only show if not already shown in Custom Mode
         if analysis_mode != "Custom Columns":
             # Filter by Folder (Batch)
-            # Get unique batches
-            unique_batches = {d.get('batch_id', 0): d.get('batch_name', 'Unknown') for d in available_datasets}
-            # Add "All" option
-            batch_options = ["All Folders"] + list(unique_batches.values())
-            
+            batch_options = get_batch_options(available_datasets)
             selected_batch_name = st.selectbox("Filter by Folder", batch_options, index=0, key=f"batch_filter_{plot_id}")
             
             # Filter datasets
