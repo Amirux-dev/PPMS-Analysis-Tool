@@ -9,6 +9,7 @@ import math
 import re
 import statistics
 import os
+import uuid
 from typing import List, Dict, Any, Optional, Tuple
 
 
@@ -287,7 +288,7 @@ def parse_multivu_content(content: str, filename: str) -> Dict[str, Any]:
     label = generate_label(meta)
 
     return {
-        "id": filename,
+        "id": str(uuid.uuid4()),
         "fileName": filename,
         "label": label,
         "temperatureK": meta['temp'],
@@ -323,6 +324,15 @@ def init_session_state():
             st.session_state[key] = value
 
 init_session_state()
+
+# --- Migration: Ensure Unique IDs ---
+# Fixes DuplicateWidgetID errors by ensuring all datasets have a unique UUID
+seen_ids = set()
+for d in st.session_state.all_datasets:
+    # If ID is missing, or is a filename (heuristic: ends with .dat), or is duplicate
+    if 'id' not in d or str(d['id']).lower().endswith('.dat') or d['id'] in seen_ids:
+        d['id'] = str(uuid.uuid4())
+    seen_ids.add(d['id'])
 
 st.title("PPMS Analysis Tool")
 st.markdown("Upload `.dat` files to visualize and analyze transport measurements (R-T, MR, I-V, etc.).")
