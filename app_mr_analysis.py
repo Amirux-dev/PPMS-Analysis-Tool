@@ -387,25 +387,19 @@ if uploaded_files:
 datasets = st.session_state.all_datasets
 
 # Folder Management Actions
-if st.sidebar.checkbox("🛠️ Organize Files", help="Enable moving files between folders"):
-    organize_mode = True
-    # Create New Folder
-    with st.sidebar.popover("➕ Create New Folder"):
-        new_folder_name = st.text_input("Folder Name", "New Folder")
-        if st.button("Create"):
-            st.session_state.batch_counter += 1
-            # Create a dummy entry or just reserve the ID? 
-            # Since our structure depends on files having a batch_id, we can't easily have empty folders without a separate data structure.
-            # Workaround: We will just use the ID for the move target.
-            # But to show it in the list, we need at least one file or a separate list of batches.
-            # Let's add a 'custom_batches' to session state.
-            if 'custom_batches' not in st.session_state:
-                st.session_state.custom_batches = {}
-            st.session_state.custom_batches[st.session_state.batch_counter] = f"📂 {new_folder_name}"
-            st.success(f"Created {new_folder_name}")
-            st.rerun()
-else:
-    organize_mode = False
+# (Always active now, no checkbox)
+organize_mode = True
+
+# Create New Folder
+with st.sidebar.popover("➕ Create New Folder", use_container_width=True):
+    new_folder_name = st.text_input("Folder Name", "New Folder")
+    if st.button("Create", use_container_width=True):
+        st.session_state.batch_counter += 1
+        if 'custom_batches' not in st.session_state:
+            st.session_state.custom_batches = {}
+        st.session_state.custom_batches[st.session_state.batch_counter] = f"📂 {new_folder_name}"
+        st.success(f"Created {new_folder_name}")
+        st.rerun()
 
 if datasets:
     # Ensure unique labels (but preserve order)
@@ -462,21 +456,22 @@ if datasets:
     if 0 in batches:
         with st.sidebar.expander(batches[0]['name'], expanded=True):
             for d in batches[0]['files']:
-                c_name, c_act = st.columns([0.7, 0.3])
+                c_name, c_act = st.columns([0.85, 0.15])
                 with c_name:
                     st.text(f"📄 {d['fileName']}")
                 with c_act:
-                    if organize_mode:
+                    with st.popover("⋮", help="Manage File"):
                         # Move Action
                         all_batch_options = {bid: info['name'] for bid, info in batches.items() if bid != 0}
                         if all_batch_options:
-                            target_bid = st.selectbox("Move", options=list(all_batch_options.keys()), format_func=lambda x: all_batch_options[x], key=f"mv_{d['id']}", label_visibility="collapsed")
-                            if st.button("Go", key=f"go_{d['id']}"):
+                            target_bid = st.selectbox("Move to", options=list(all_batch_options.keys()), format_func=lambda x: all_batch_options[x], key=f"mv_sel_{d['id']}")
+                            if st.button("Move", key=f"mv_btn_{d['id']}"):
                                 d['batch_id'] = target_bid
                                 d['batch_name'] = all_batch_options[target_bid]
                                 st.rerun()
-                    else:
-                        if st.button("✕", key=f"rm_{d['id']}", help="Remove file"):
+                        
+                        st.markdown("---")
+                        if st.button("Delete", key=f"rm_{d['id']}", type="primary"):
                             st.session_state.all_datasets.remove(d)
                             st.rerun()
     
@@ -502,27 +497,28 @@ if datasets:
                 st.rerun()
                 
             for d in batches[bid]['files']:
-                c_name, c_act = st.columns([0.7, 0.3])
+                c_name, c_act = st.columns([0.85, 0.15])
                 with c_name:
                     st.text(f"📄 {d['fileName']}")
                 with c_act:
-                    if organize_mode:
+                    with st.popover("⋮", help="Manage File"):
                         # Move Action
                         all_batch_options = {b: info['name'] for b, info in batches.items() if b != bid}
                         # Add File by File as option
                         all_batch_options[0] = "📄 File by file import"
                         
                         if all_batch_options:
-                            target_bid = st.selectbox("Move", options=list(all_batch_options.keys()), format_func=lambda x: all_batch_options[x], key=f"mv_{d['id']}", label_visibility="collapsed")
-                            if st.button("Go", key=f"go_{d['id']}"):
+                            target_bid = st.selectbox("Move to", options=list(all_batch_options.keys()), format_func=lambda x: all_batch_options[x], key=f"mv_sel_{d['id']}")
+                            if st.button("Move", key=f"mv_btn_{d['id']}"):
                                 d['batch_id'] = target_bid
                                 if target_bid == 0:
                                     d['batch_name'] = "📄 File by file import"
                                 else:
                                     d['batch_name'] = batches[target_bid]['name']
                                 st.rerun()
-                    else:
-                        if st.button("✕", key=f"rm_{d['id']}", help="Remove file"):
+                        
+                        st.markdown("---")
+                        if st.button("Delete", key=f"rm_{d['id']}", type="primary"):
                             st.session_state.all_datasets.remove(d)
                             st.rerun()
     
@@ -590,8 +586,9 @@ def create_plot_interface(plot_id: str, available_datasets: List[Dict[str, Any]]
     
     with st.container(border=True):
         # Header with Actions
-        c_head1, c_head2, c_head3, c_head4 = st.columns([0.55, 0.15, 0.15, 0.15], vertical_alignment="center")
-        with c_head1:
+        c_head_title, c_head_actions = st.columns([0.7, 0.3], vertical_alignment="center")
+        
+        with c_head_title:
             # Editable Plot Name (Styled as Header)
             c_h_text, c_h_edit = st.columns([0.9, 0.1], vertical_alignment="center")
             with c_h_text:
@@ -602,17 +599,15 @@ def create_plot_interface(plot_id: str, available_datasets: List[Dict[str, Any]]
                 with st.popover("✏️", help="Rename Plot"):
                     st.text_input("Name", value=plot_name, key=f"pname_{plot_id}")
         
-        # Add Button
-        with c_head2:
-            st.button("➕", key=f"add_btn_{plot_id}", help="Add a new plot", on_click=add_plot_callback)
-
-        # Remove Button
-        with c_head3:
-            st.button("➖", key=f"del_btn_{plot_id}", help="Remove this plot", on_click=remove_plot_callback, args=(plot_id,))
-
-        # Duplicate Button
-        with c_head4:
-            st.button("📋", key=f"dup_{plot_id}", help="Duplicate this plot", on_click=duplicate_plot_callback, args=(plot_id,))
+        with c_head_actions:
+            # Action Buttons (Add, Remove, Duplicate)
+            b_add, b_rem, b_dup = st.columns(3)
+            with b_add:
+                st.button("➕", key=f"add_btn_{plot_id}", help="Add a new plot", on_click=add_plot_callback, use_container_width=True)
+            with b_rem:
+                st.button("➖", key=f"del_btn_{plot_id}", help="Remove this plot", on_click=remove_plot_callback, args=(plot_id,), use_container_width=True)
+            with b_dup:
+                st.button("📋", key=f"dup_{plot_id}", help="Duplicate this plot", on_click=duplicate_plot_callback, args=(plot_id,), use_container_width=True)
         
         # Row 0: Analysis Mode
         analysis_mode = st.selectbox(
