@@ -392,16 +392,12 @@ if uploaded_files:
 # (Always active now, no checkbox)
 organize_mode = True
 
-# Create New Folder
-with st.sidebar.popover("➕ Create New Folder", use_container_width=True):
-    new_folder_name = st.text_input("Folder Name", "New Folder")
-    if st.button("Create", use_container_width=True):
-        st.session_state.batch_counter += 1
-        st.session_state.custom_batches[st.session_state.batch_counter] = f"📂 {new_folder_name}"
-        st.success(f"Created {new_folder_name}")
-        st.rerun()
-
 # Callbacks for File Management
+def create_folder_callback():
+    new_name = st.session_state.get("new_folder_name_input", "New Folder")
+    st.session_state.batch_counter += 1
+    st.session_state.custom_batches[st.session_state.batch_counter] = f"📂 {new_name}"
+
 def move_file_callback(file_id, target_bid, target_name):
     for d in st.session_state.all_datasets:
         if d['id'] == file_id:
@@ -437,6 +433,11 @@ def delete_batch_callback(batch_id):
     # Delete the batch entry
     if 'custom_batches' in st.session_state and batch_id in st.session_state.custom_batches:
         del st.session_state.custom_batches[batch_id]
+
+# Create New Folder UI
+with st.sidebar.popover("➕ Create New Folder", use_container_width=True):
+    st.text_input("Folder Name", "New Folder", key="new_folder_name_input")
+    st.button("Create", use_container_width=True, on_click=create_folder_callback)
 
 def rename_batch_callback(batch_id, old_name):
     # Get new name from session state widget
