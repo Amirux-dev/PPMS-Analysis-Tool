@@ -1282,10 +1282,11 @@ with st.expander("View Raw Data Metadata"):
             with c_data:
                 st.markdown("### Data Preview")
                 if 'full_df' in d:
-                    st.dataframe(d['full_df'], use_container_width=True, height=300)
+                    # Filter out completely empty columns
+                    df_display = d['full_df'].dropna(axis=1, how='all')
+                    st.dataframe(df_display, use_container_width=True, height=300)
                 else:
                     st.info("Full dataframe not available.")
         else:
             st.info("No files in this folder.")
-        st.dataframe(pd.DataFrame({"Field (T)": d["H_T"], "Resistance": d["R"]}).head(100))
 
