@@ -308,6 +308,47 @@ def parse_multivu_content(content: str, filename: str) -> Dict[str, Any]:
 
 st.set_page_config(page_title="PPMS Analysis Tool", layout="wide")
 
+def persistent_selectbox(label, options, persistent_key, **kwargs):
+    """
+    A wrapper around st.selectbox that persists its value across reruns 
+    even when the widget key changes (e.g. due to uploader_key rotation).
+    """
+    uploader_key = st.session_state.get('uploader_key', 0)
+    
+    # Initialize if missing
+    if persistent_key not in st.session_state:
+        default_idx = kwargs.get('index', 0)
+        if 0 <= default_idx < len(options):
+            st.session_state[persistent_key] = options[default_idx]
+        elif options:
+            st.session_state[persistent_key] = options[0]
+            
+    # Dynamic Key
+    widget_key = f"{persistent_key}_{uploader_key}"
+    
+    # Sync Widget -> State (if widget was interacted with or just rendered)
+    if widget_key in st.session_state:
+        st.session_state[persistent_key] = st.session_state[widget_key]
+        
+    # Get current value
+    current_val = st.session_state.get(persistent_key)
+    
+    # Find index
+    try:
+        idx = options.index(current_val)
+    except (ValueError, IndexError):
+        # Value not in options (e.g. column missing in new file)
+        idx = kwargs.get('index', 0)
+        # Update state to valid value
+        if 0 <= idx < len(options):
+             st.session_state[persistent_key] = options[idx]
+    
+    # Remove index/key from kwargs to avoid conflict
+    kwargs.pop('index', None)
+    kwargs.pop('key', None)
+    
+    return st.selectbox(label, options, index=idx, key=widget_key, **kwargs)
+
 def init_session_state():
     """Initialize all session state variables."""
     defaults = {
@@ -891,11 +932,11 @@ def create_plot_interface(plot_id: str, available_datasets: List[Dict[str, Any]]
                 st.button("📋", key=f"dup_{plot_id}", help="Duplicate this plot", on_click=duplicate_plot_callback, args=(plot_id,), width='stretch')
         
         # Row 0: Analysis Mode
-        analysis_mode = st.selectbox(
+        analysis_mode = persistent_selectbox(
             "Analysis Mode",
             ["Custom Columns", "Standard MR Analysis", "Standard R-T Analysis"],
             index=0,
-            key=f"mode_{plot_id}"
+            persistent_key=f"mode_{plot_id}"
         )
         
         # --- Unified File Selection ---
@@ -1009,37 +1050,37 @@ def create_plot_interface(plot_id: str, available_datasets: List[Dict[str, Any]]
         
         if analysis_mode == "Standard MR Analysis":
             # R0 Method
-            r0_method = st.selectbox(
+            r0_method = persistent_selectbox(
                 "R0 Calculation Method",
                 ["Closest to 0T", "Mean within Window", "First Point"],
                 index=0,
-                key=f"r0_meth_{plot_id}"
+                persistent_key=f"r0_meth_{plot_id}"
             )
             r0_window = 0.01
             if r0_method == "Mean within Window":
                 r0_window = st.number_input("Zero Field Window (T)", value=0.01, step=0.005, format="%.4f", key=f"r0_win_{plot_id}")
 
             with c1:
-                y_axis_mode = st.selectbox(
+                y_axis_mode = persistent_selectbox(
                     "Y-Axis Mode",
                     ["Magnetoresistance (MR %)", "Resistance (Ω)", "Normalized (R/R0)", "Derivative (dR/dH)"],
                     index=0,
-                    key=f"y_mode_{plot_id}"
+                    persistent_key=f"y_mode_{plot_id}"
                 )
             with c2:
-                x_axis_unit = st.selectbox(
+                x_axis_unit = persistent_selectbox(
                     "X-Axis Unit",
                     ["Tesla (T)", "Oersted (Oe)"],
                     index=0,
-                    key=f"x_unit_{plot_id}"
+                    persistent_key=f"x_unit_{plot_id}"
                 )
         elif analysis_mode == "Standard R-T Analysis":
             with c1:
-                y_axis_mode = st.selectbox(
+                y_axis_mode = persistent_selectbox(
                     "Y-Axis Mode",
                     ["Resistance (Ω)", "Normalized (R/R_300K)", "Derivative (dR/dT)"],
                     index=0,
-                    key=f"y_mode_{plot_id}"
+                    persistent_key=f"y_mode_{plot_id}"
                 )
             with c2:
                 # Use disabled selectbox for alignment
@@ -1064,9 +1105,9 @@ def create_plot_interface(plot_id: str, available_datasets: List[Dict[str, Any]]
                 display_cols.append("Magnetic Field (T)")
 
             with c1:
-                custom_y_col = st.selectbox("Y Column", display_cols, index=0 if display_cols else 0, key=f"y_col_{plot_id}")
+                custom_y_col = persistent_selectbox("Y Column", display_cols, index=0 if display_cols else 0, persistent_key=f"y_col_{plot_id}")
             with c2:
-                custom_x_col = st.selectbox("X Column", display_cols, index=1 if len(display_cols) > 1 else 0, key=f"x_col_{plot_id}")
+                custom_x_col = persistent_selectbox("X Column", display_cols, index=1 if len(display_cols) > 1 else 0, persistent_key=f"x_col_{plot_id}")
             
             # Oe to T conversion removed (handled by virtual column)
 
