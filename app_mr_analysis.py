@@ -1009,7 +1009,7 @@ def create_plot_interface(plot_id: str, available_datasets: List[Dict[str, Any]]
     
     with st.container(border=True):
         # Header with Actions
-        c_head_title, c_head_actions = st.columns([0.75, 0.25], vertical_alignment="center")
+        c_head_title, c_head_actions = st.columns([0.55, 0.15], vertical_alignment="center")
         
         with c_head_title:
             # Plot Name or Edit Input
