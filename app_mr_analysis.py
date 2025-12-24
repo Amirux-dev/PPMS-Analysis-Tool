@@ -410,7 +410,25 @@ def move_file_callback(file_id, target_bid, target_name):
             break
 
 def delete_file_callback(file_id):
+    # Find the file name before deleting
+    file_to_delete = None
+    for d in st.session_state.all_datasets:
+        if d['id'] == file_id:
+            file_to_delete = d['fileName']
+            break
+            
+    # Remove from dataset
     st.session_state.all_datasets = [d for d in st.session_state.all_datasets if d['id'] != file_id]
+    
+    # Clean up selections in plots
+    if file_to_delete:
+        for key in list(st.session_state.keys()):
+            if key.startswith("sel_"):
+                # This is a multiselect key, value is a list of filenames
+                current_selection = st.session_state[key]
+                if isinstance(current_selection, list) and file_to_delete in current_selection:
+                    current_selection.remove(file_to_delete)
+                    st.session_state[key] = current_selection
 
 def delete_batch_callback(batch_id):
     # Delete files in the batch
@@ -677,6 +695,31 @@ def create_plot_interface(plot_id: str, available_datasets: List[Dict[str, Any]]
             key=f"mode_{plot_id}"
         )
         
+        # --- Unified File Selection (Moved to Top) ---
+        # Filter by Folder (Batch)
+        batch_options = get_batch_options(available_datasets)
+        selected_batch_name = st.selectbox("Filter by Folder", batch_options, index=0, key=f"batch_filter_{plot_id}")
+        
+        if selected_batch_name != "All Folders":
+            filtered_datasets = [d for d in available_datasets if d.get('batch_name') == selected_batch_name]
+        else:
+            filtered_datasets = available_datasets
+
+        # Use Raw Filenames for Selection
+        options = [d['fileName'] for d in filtered_datasets]
+        
+        # Ensure default selection is valid
+        current_sel = st.session_state.get(f"sel_{plot_id}", [])
+        valid_sel = [f for f in current_sel if f in options]
+        
+        selected_filenames = st.multiselect(
+            f"Select Curves for Plot {plot_id}", 
+            options, 
+            default=valid_sel if not st.session_state.get(f"sel_{plot_id}") else None, # Use default only if no state
+            key=f"sel_{plot_id}"
+        )
+        selected_datasets = [d for d in filtered_datasets if d['fileName'] in selected_filenames]
+        
         # Row 1: Axes & Style
         c1, c2 = st.columns([2, 1])
         
@@ -725,23 +768,6 @@ def create_plot_interface(plot_id: str, available_datasets: List[Dict[str, Any]]
             # Get columns from the first available dataset as reference
             ref_cols = []
             
-            # File Selector (Multiselect) - Moved up to determine available columns
-            
-            # Filter by Folder (Batch)
-            batch_options = get_batch_options(available_datasets)
-            selected_batch_name = st.selectbox("Filter by Folder", batch_options, index=0, key=f"batch_filter_cust_{plot_id}")
-            
-            if selected_batch_name != "All Folders":
-                filtered_datasets = [d for d in available_datasets if d.get('batch_name') == selected_batch_name]
-            else:
-                filtered_datasets = available_datasets
-
-            # Use Raw Filenames for Selection (Consistent across modes)
-            options = [d['fileName'] for d in filtered_datasets]
-            default_sel = [] 
-            selected_filenames = st.multiselect(f"Select Curves for Plot {plot_id}", options, default=default_sel, key=f"sel_{plot_id}")
-            selected_datasets = [d for d in filtered_datasets if d['fileName'] in selected_filenames]
-
             if selected_datasets:
                 # Find common non-empty columns or just take from first
                 # Let's take the first one for simplicity but filter for non-empty
@@ -779,26 +805,6 @@ def create_plot_interface(plot_id: str, available_datasets: List[Dict[str, Any]]
                 symmetrize = False
                 plot_derivative = st.toggle("Plot Derivative (dY/dX)", value=False, key=f"deriv_{plot_id}", help="Plot dY/dX vs X")
                 show_linear_fit = st.toggle("Show Linear Fit", value=False, key=f"fit_{plot_id}", help="Fit Y = aX + b")
-
-        # File Selector (Multiselect) - Only show if not already shown in Custom Mode
-        if analysis_mode != "Custom Columns":
-            # Filter by Folder (Batch)
-            batch_options = get_batch_options(available_datasets)
-            selected_batch_name = st.selectbox("Filter by Folder", batch_options, index=0, key=f"batch_filter_{plot_id}")
-            
-            # Filter datasets
-            if selected_batch_name != "All Folders":
-                filtered_datasets = [d for d in available_datasets if d.get('batch_name') == selected_batch_name]
-            else:
-                filtered_datasets = available_datasets
-            
-            # Use Raw Filenames for Selection
-            options = [d['fileName'] for d in filtered_datasets]
-            default_sel = [] 
-            selected_filenames = st.multiselect(f"Select Curves for Plot {plot_id}", options, default=default_sel, key=f"sel_{plot_id}")
-            
-            # Map back to dataset objects
-            selected_datasets = [d for d in filtered_datasets if d['fileName'] in selected_filenames]
 
         if not selected_datasets:
             st.info("Select at least one file to display the plot.")
