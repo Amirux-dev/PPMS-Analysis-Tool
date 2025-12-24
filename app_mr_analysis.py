@@ -298,11 +298,6 @@ def parse_multivu_content(content: str, filename: str) -> Dict[str, Any]:
         "full_df": df_full,
         "metadata": meta
     }
-        "rCol": resist_name,
-        "H_T": H_T,
-        "R": R,
-        "full_df": df_full
-    }
 
 # -----------------------------------------------------------------------------
 # STREAMLIT APP
