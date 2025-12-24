@@ -1264,29 +1264,25 @@ with st.expander("View Raw Data Metadata"):
             selected_meta_idx = st.selectbox("Select File to Inspect", range(len(filtered_datasets)), format_func=lambda i: dataset_names[i], key="meta_file_sel")
             d = filtered_datasets[selected_meta_idx]
             
-            c_meta, c_data = st.columns([0.3, 0.7])
-            
-            with c_meta:
-                st.markdown("### Metadata")
-                metadata = {
-                    "File Name": d["fileName"],
-                    "Label": d["label"],
-                    "Temperature (K)": d["temperatureK"],
-                    "Direction": d["direction"],
-                    "Field Column": d["fieldCol"],
-                    "Resistance Column": d["rCol"],
-                    "Batch": d.get("batch_name", "None")
-                }
-                st.json(metadata)
-            
-            with c_data:
-                st.markdown("### Data Preview")
-                if 'full_df' in d:
-                    # Filter out completely empty columns
-                    df_display = d['full_df'].dropna(axis=1, how='all')
-                    st.dataframe(df_display, use_container_width=True, height=300)
-                else:
-                    st.info("Full dataframe not available.")
+            st.markdown("### Metadata")
+            metadata = {
+                "File Name": d["fileName"],
+                "Label": d["label"],
+                "Temperature (K)": d["temperatureK"],
+                "Direction": d["direction"],
+                "Field Column": d["fieldCol"],
+                "Resistance Column": d["rCol"],
+                "Batch": d.get("batch_name", "None")
+            }
+            st.json(metadata)
+        
+            st.markdown("### Data Preview")
+            if 'full_df' in d:
+                # Filter out completely empty columns
+                df_display = d['full_df'].dropna(axis=1, how='all')
+                st.dataframe(df_display, use_container_width=True, height=300)
+            else:
+                st.info("Full dataframe not available.")
         else:
             st.info("No files in this folder.")
 
