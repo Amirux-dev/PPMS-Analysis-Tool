@@ -329,6 +329,16 @@ uploaded_files = st.sidebar.file_uploader(
     help="Drag and drop files or folders here. They will be automatically processed."
 )
 
+# --- Sidebar: Footer (Always Visible) ---
+st.sidebar.markdown("---")
+st.sidebar.markdown("""
+**Author:** Amir MEDDAS  
+*C2N - Centre de Nanosciences et de Nanotechnologies*  
+*LPS - Laboratoire de Physique des Solides*  
+[![LinkedIn](https://img.shields.io/badge/LinkedIn-0077B5?style=for-the-badge&logo=linkedin&logoColor=white)](https://www.linkedin.com/in/amir-meddas-80876424b/)
+""")
+st.sidebar.markdown("---")
+
 # Process Uploaded Files Automatically
 if uploaded_files:
     # Determine Batch Type
@@ -394,15 +404,15 @@ if datasets:
             d['label'] = f"{l} ({d['fileName']})"
     
     # Explorer UI
-    st.sidebar.markdown("---")
-    c_info, c_clear = st.sidebar.columns([2, 1], vertical_alignment="center")
-    with c_info:
-        st.write(f"**Total Files:** {len(datasets)}")
-    with c_clear:
-        if st.button("🗑️ Clear", help="Remove all loaded data"):
-            st.session_state.all_datasets = []
-            st.session_state.batch_counter = 0
-            st.rerun()
+    st.sidebar.markdown("### Loaded Data")
+    
+    # Clear All Button (Left Aligned)
+    if st.sidebar.button("🗑️ Clear All Data", help="Remove all loaded data"):
+        st.session_state.all_datasets = []
+        st.session_state.batch_counter = 0
+        st.rerun()
+        
+    st.sidebar.write(f"**Total Files:** {len(datasets)}")
 
     # Group by Batch
     # Special handling: Batch 0 (File by file) is merged
@@ -428,14 +438,40 @@ if datasets:
     if 0 in batches:
         with st.sidebar.expander(batches[0]['name'], expanded=True):
             for d in batches[0]['files']:
-                st.text(f"📄 {d['fileName']}")
+                c_name, c_del = st.columns([0.85, 0.15])
+                with c_name:
+                    st.text(f"📄 {d['fileName']}")
+                with c_del:
+                    if st.button("✕", key=f"rm_{d['id']}", help="Remove file"):
+                        st.session_state.all_datasets.remove(d)
+                        st.rerun()
     
     # Display other batches
     for bid in batch_order:
         if bid == 0: continue
-        with st.sidebar.expander(batches[bid]['name'], expanded=True):
+        
+        b_name = batches[bid]['name']
+        with st.sidebar.expander(b_name, expanded=True):
+            # Rename Feature
+            col_ren, col_help = st.columns([4, 1])
+            with col_ren:
+                new_name = st.text_input("Folder Name", value=b_name, key=f"rename_{bid}", label_visibility="collapsed")
+            
+            if new_name != b_name:
+                # Update all files in this batch
+                for d in st.session_state.all_datasets:
+                    if d.get('batch_id') == bid:
+                        d['batch_name'] = new_name
+                st.rerun()
+                
             for d in batches[bid]['files']:
-                st.text(f"📄 {d['fileName']}")
+                c_name, c_del = st.columns([0.85, 0.15])
+                with c_name:
+                    st.text(f"📄 {d['fileName']}")
+                with c_del:
+                    if st.button("✕", key=f"rm_{d['id']}", help="Remove file"):
+                        st.session_state.all_datasets.remove(d)
+                        st.rerun()
     
     st.sidebar.caption("⚠️ Refreshing the page will clear the data.")
 
@@ -494,7 +530,8 @@ def create_plot_interface(plot_id: str, available_datasets: List[Dict[str, Any]]
         # Header with Actions
         c_head1, c_head2, c_head3, c_head4 = st.columns([0.55, 0.15, 0.15, 0.15], vertical_alignment="center")
         with c_head1:
-            st.markdown(f"### Plot {plot_id}")
+            # Editable Plot Name
+            st.text_input("Plot Name", value=f"Plot {plot_id}", key=f"pname_{plot_id}", label_visibility="collapsed")
         
         # Add Button
         with c_head2:
