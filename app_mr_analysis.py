@@ -485,8 +485,12 @@ def rename_batch_callback(batch_id, old_name):
 
 def render_file_actions(file_data: Dict[str, Any], current_batch_id: int, all_batches_info: Dict[int, Dict[str, Any]]):
     """Helper to render the Move/Delete actions for a file."""
+    # Ensure ID is a string
+    file_id = str(file_data.get('id', uuid.uuid4()))
+    
     # Use a unique key for the popover based on file ID to prevent state leakage
-    with st.popover("⋮", help="Manage File", key=f"pop_{file_data['id']}"):
+    # Note: Removed 'help' parameter as it might cause TypeError in some Streamlit versions
+    with st.popover("⋮", key=f"pop_{file_id}"):
         st.markdown("**Move File**")
         
         # Filter options: exclude current batch
