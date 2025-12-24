@@ -10,11 +10,6 @@ import re
 import statistics
 from typing import List, Dict, Any, Optional, Tuple
 
-# -----------------------------------------------------------------------------
-# CONFIGURATION
-# -----------------------------------------------------------------------------
-
-# (Default files removed as requested)
 
 # -----------------------------------------------------------------------------
 # PARSING LOGIC (Adapted from original script)
