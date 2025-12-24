@@ -1287,12 +1287,5 @@ with st.expander("View Raw Data Metadata"):
                     st.info("Full dataframe not available.")
         else:
             st.info("No files in this folder.")
-            "Direction": d["direction"],
-            "Field Column": d["fieldCol"],
-            "Resistance Column": d["rCol"],
-            "Data Points": len(d["H_T"])
-        }
-        st.json(metadata)
-        st.write(f"Raw data preview for {d['label']}:")
         st.dataframe(pd.DataFrame({"Field (T)": d["H_T"], "Resistance": d["R"]}).head(100))
 
