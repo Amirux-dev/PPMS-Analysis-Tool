@@ -125,10 +125,23 @@ with st.sidebar.expander("💾 Project Management", expanded=False):
     # 1. Import Section
     uploaded_projs = st.file_uploader("Import .ppms projects", type=["ppms"], accept_multiple_files=True, key=f"imp_proj_{st.session_state.get('proj_import_key',0)}", help="Add existing projects to your workspace.")
     if uploaded_projs:
+        last_imported = None
         for up in uploaded_projs:
             import_project_file(up.name, up.getvalue())
+            last_imported = up.name
+        
+        if last_imported:
+            # Ensure extension consistency
+            if not last_imported.endswith('.ppms'):
+                last_imported += '.ppms'
+                
+            if load_project_file(last_imported):
+                st.session_state.active_project = last_imported
+                st.toast(f"Imported and loaded {last_imported}!", icon="📂")
+            else:
+                st.toast(f"Imported {len(uploaded_projs)} projects!", icon="📥")
+
         st.session_state.proj_import_key = st.session_state.get('proj_import_key', 0) + 1
-        st.toast(f"Imported {len(uploaded_projs)} projects!", icon="📥")
         st.rerun()
 
     # 2. Project Selector
