@@ -523,11 +523,12 @@ def create_plot_interface(plot_id: str, available_datasets: List[Dict[str, Any]]
                             with c_btn:
                                 last_click = st.session_state.get(f"last_click_{plot_id}")
                                 if last_click:
-                                    st.caption(f"Sel: {x_fmt % last_click['x']}, {y_fmt % last_click['y']}")
+                                    sel_str = f"{x_fmt % last_click['x']}, {y_fmt % last_click['y']}"
+                                    st.markdown(f"<div style='font-size: 14px; margin-bottom: 0.5rem;'>Sel: {sel_str}</div>", unsafe_allow_html=True)
                                 else:
-                                    st.caption("No point selected")
+                                    st.markdown(f"<div style='font-size: 14px; margin-bottom: 0.5rem;'>No point selected</div>", unsafe_allow_html=True)
                                 st.button("📍 Paste", key=f"paste_fit_{plot_id}_{fid}", help="Paste clicked coordinates", 
-                                          on_click=perform_paste, 
+                                          on_click=perform_paste, use_container_width=True,
                                           args=(plot_id, f"fit_ax_{plot_id}_{fid}", f"fit_ay_{plot_id}_{fid}", True))
 
                             linear_fit_settings[fid] = {"color": f_color, "annot_x": f_annot_x, "annot_y": f_annot_y, "style": f_style, "width": f_width}
@@ -573,11 +574,12 @@ def create_plot_interface(plot_id: str, available_datasets: List[Dict[str, Any]]
                             with c_btn:
                                 last_click = st.session_state.get(f"last_click_{plot_id}")
                                 if last_click:
-                                    st.caption(f"Sel: {x_fmt % last_click['x']}, {y_fmt % last_click['y']}")
+                                    sel_str = f"{x_fmt % last_click['x']}, {y_fmt % last_click['y']}"
+                                    st.markdown(f"<div style='font-size: 14px; margin-bottom: 0.5rem;'>Sel: {sel_str}</div>", unsafe_allow_html=True)
                                 else:
-                                    st.caption("No point selected")
+                                    st.markdown(f"<div style='font-size: 14px; margin-bottom: 0.5rem;'>No point selected</div>", unsafe_allow_html=True)
                                 st.button("📍 Paste", key=f"paste_pfit_{plot_id}_{fid}", help="Paste clicked coordinates", 
-                                          on_click=perform_paste, 
+                                          on_click=perform_paste, use_container_width=True,
                                           args=(plot_id, f"pfit_ax_{plot_id}_{fid}", f"pfit_ay_{plot_id}_{fid}", True))
 
                             parabolic_fit_settings[fid] = {"color": pf_color, "annot_x": pf_annot_x, "annot_y": pf_annot_y, "style": pf_style, "width": pf_width}
