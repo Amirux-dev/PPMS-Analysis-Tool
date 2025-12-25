@@ -164,7 +164,11 @@ def persistent_selectbox(label, options, persistent_key, **kwargs):
     kwargs.pop('key', None)
     
     # 7. Render widget
-    selected_val = st.selectbox(label, options, index=idx, key=widget_key, **kwargs)
+    # Avoid passing 'index' if the key is already in session_state to prevent warnings
+    if widget_key in st.session_state:
+        selected_val = st.selectbox(label, options, key=widget_key, **kwargs)
+    else:
+        selected_val = st.selectbox(label, options, index=idx, key=widget_key, **kwargs)
     
     # 8. Sync back to store (handles the case where we just initialized with default)
     if store.get(persistent_key) != selected_val:

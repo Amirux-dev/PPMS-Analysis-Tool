@@ -685,29 +685,27 @@ def create_plot_interface(plot_id: str, available_datasets: List[Dict[str, Any]]
                         annot["y"] = st.number_input("Y", value=float(annot["y"]), format=y_fmt, step=y_step, key=f"annot_y_{plot_id}_{i}")
                     with c_btn:
                         last_click = st.session_state.get(f"last_click_{plot_id}")
-                        help_text = "1. Click a data point on the plot.\n2. Click this button to paste coordinates."
                         if last_click:
-                            st.caption(f"Sel: {x_fmt % last_click['x']}, {y_fmt % last_click['y']}")
+                            sel_str = f"{x_fmt % last_click['x']}, {y_fmt % last_click['y']}"
+                            st.markdown(f"<div style='font-size: 14px; margin-bottom: 0.5rem;'>Sel: {sel_str}</div>", unsafe_allow_html=True)
                         else:
-                            st.caption("No point selected")
+                            st.markdown(f"<div style='font-size: 14px; margin-bottom: 0.5rem;'>No point selected</div>", unsafe_allow_html=True)
                         
-                        st.button("📍 Paste Click", key=f"paste_click_{plot_id}_{i}", help=help_text, 
-                                  on_click=perform_paste, 
+                        st.button("📍 Paste Click", key=f"paste_click_{plot_id}_{i}", 
+                                  on_click=perform_paste, use_container_width=True,
                                   args=(plot_id, f"annot_x_{plot_id}_{i}", f"annot_y_{plot_id}_{i}", False))
 
-                    c_col, c_size = st.columns(2)
-                    with c_col:
+                    c_style_row = st.columns([1, 1, 2, 0.7, 0.7], vertical_alignment="bottom")
+                    with c_style_row[0]:
                         annot["color"] = st.color_picker("Color", value=annot["color"], key=f"annot_col_{plot_id}_{i}")
-                    with c_size:
+                    with c_style_row[1]:
                         annot["size"] = st.number_input("Size", value=int(annot["size"]), min_value=5, key=f"annot_sz_{plot_id}_{i}")
-                    
-                    c_font, c_style = st.columns([2, 1], vertical_alignment="bottom")
-                    with c_font:
+                    with c_style_row[2]:
                         annot["font"] = st.selectbox("Font", ["Arial", "Times New Roman", "Courier New", "Verdana", "Georgia"], index=0 if annot["font"] == "Arial" else 1, key=f"annot_font_{plot_id}_{i}")
-                    with c_style:
-                        c_b, c_i = st.columns(2)
-                        with c_b: annot["bold"] = st.checkbox("Bold", value=annot["bold"], key=f"annot_bold_{plot_id}_{i}")
-                        with c_i: annot["italic"] = st.checkbox("Italic", value=annot["italic"], key=f"annot_italic_{plot_id}_{i}")
+                    with c_style_row[3]:
+                        annot["bold"] = st.checkbox("Bold", value=annot["bold"], key=f"annot_bold_{plot_id}_{i}")
+                    with c_style_row[4]:
+                        annot["italic"] = st.checkbox("Italic", value=annot["italic"], key=f"annot_italic_{plot_id}_{i}")
 
                     st.divider()
 
