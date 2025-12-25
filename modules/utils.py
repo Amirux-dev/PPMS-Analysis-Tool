@@ -194,7 +194,10 @@ def persistent_input(widget_func, persistent_key, **kwargs):
         
     # 2. Get value to display (Store > Default)
     if persistent_key in store:
-        kwargs['value'] = store[persistent_key]
+        # Only pass 'value' if the widget key is NOT already in session state
+        # This prevents the "created with a default value but also had its value set via Session State API" warning
+        if widget_key not in st.session_state:
+            kwargs['value'] = store[persistent_key]
         
     # 3. Render
     val = widget_func(key=widget_key, **kwargs)

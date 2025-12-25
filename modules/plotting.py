@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
+import copy
 import plotly.graph_objects as go
 from typing import List, Dict, Any, Optional
 from modules.utils import persistent_selectbox, persistent_input, save_session_state
@@ -111,13 +112,16 @@ def duplicate_plot_callback(plot_id):
         p_store = st.session_state['persistent_values']
         new_entries = {}
         for key, val in p_store.items():
+            # Deep copy mutable values to avoid shared state
+            val_copy = copy.deepcopy(val)
+            
             if key.endswith(f"_{plot_id}"):
                 base = key[:-len(str(plot_id))] # remove old id
                 new_key = f"{base}{new_id}"
-                new_entries[new_key] = val
+                new_entries[new_key] = val_copy
             elif f"_{plot_id}_" in key:
                 new_key = key.replace(f"_{plot_id}_", f"_{new_id}_")
-                new_entries[new_key] = val
+                new_entries[new_key] = val_copy
         p_store.update(new_entries)
     
     # Copy state
@@ -125,16 +129,24 @@ def duplicate_plot_callback(plot_id):
         # Exclude buttons and temporary states
         if any(x in key for x in ["dup_", "add_btn_", "del_btn_", "ren_btn_"]): continue
         
+        new_key = None
         # Case 1: Key ends with _{plot_id} (Standard widgets)
         if key.endswith(f"_{plot_id}"):
-            base = key[:-len(plot_id)] # remove old id (keep the underscore)
+            base = key[:-len(str(plot_id))] # remove old id
             new_key = f"{base}{new_id}"
-            st.session_state[new_key] = st.session_state[key]
         
         # Case 2: Key contains _{plot_id}_ (Dynamic widgets like legends: leg_{plot_id}_{file_id})
         elif f"_{plot_id}_" in key:
             new_key = key.replace(f"_{plot_id}_", f"_{new_id}_")
-            st.session_state[new_key] = st.session_state[key]
+            
+        if new_key:
+            val = st.session_state[key]
+            # Deep copy for mutable types (lists, dicts) to ensure independence
+            if isinstance(val, (list, dict)):
+                st.session_state[new_key] = copy.deepcopy(val)
+            else:
+                st.session_state[new_key] = val
+                
     save_session_state()
 
 def get_batch_map(datasets: List[Dict[str, Any]], custom_batches: Dict[int, str] = None) -> Dict[Any, str]:
@@ -456,19 +468,25 @@ def create_plot_interface(plot_id: str, available_datasets: List[Dict[str, Any]]
                             st.caption(f"Settings for: {fit_options[fid]}")
                             c_fc, c_fs = st.columns(2)
                             with c_fc: f_color = persistent_input(st.color_picker, f"fit_col_{plot_id}_{fid}", label="Line Color", value="#FF0000")
+                            with c_fs: 
+                                f_style = persistent_selectbox("Line Style", ["dash", "solid", "dot", "dashdot"], index=0, persistent_key=f"fit_style_{plot_id}_{fid}")
+                                f_width = persistent_input(st.number_input, f"fit_width_{plot_id}_{fid}", label="Width", value=2.0, step=0.5)
                             
                             c_ax, c_ay, c_btn = st.columns([1, 1, 1])
                             with c_ax: f_annot_x = persistent_input(st.number_input, f"fit_ax_{plot_id}_{fid}", label="Annot X", value=None, placeholder="Auto", format=x_fmt, step=x_step)
                             with c_ay: f_annot_y = persistent_input(st.number_input, f"fit_ay_{plot_id}_{fid}", label="Annot Y", value=None, placeholder="Auto", format=y_fmt, step=y_step)
                             with c_btn:
-                                st.write("")
-                                st.write("")
+                                last_click = st.session_state.get(f"last_click_{plot_id}")
+                                if last_click:
+                                    st.caption(f"Sel: {x_fmt % last_click['x']}, {y_fmt % last_click['y']}")
+                                else:
+                                    st.caption("No point selected")
                                 
                                 st.button("📍 Paste", key=f"paste_fit_{plot_id}_{fid}", help="Paste clicked coordinates", 
                                           on_click=perform_paste, 
                                           args=(plot_id, f"fit_ax_{plot_id}_{fid}", f"fit_ay_{plot_id}_{fid}", True))
 
-                            linear_fit_settings[fid] = {"color": f_color, "annot_x": f_annot_x, "annot_y": f_annot_y}
+                            linear_fit_settings[fid] = {"color": f_color, "annot_x": f_annot_x, "annot_y": f_annot_y, "style": f_style, "width": f_width}
                 
                 if show_parabolic_fit:
                     with st.expander("Parabolic Fit Configuration", expanded=True):
@@ -490,19 +508,25 @@ def create_plot_interface(plot_id: str, available_datasets: List[Dict[str, Any]]
                             st.caption(f"Settings for: {fit_options[fid]}")
                             c_fc, c_fs = st.columns(2)
                             with c_fc: pf_color = persistent_input(st.color_picker, f"pfit_col_{plot_id}_{fid}", label="Line Color", value="#00FF00")
+                            with c_fs: 
+                                pf_style = persistent_selectbox("Line Style", ["dot", "solid", "dash", "dashdot"], index=0, persistent_key=f"pfit_style_{plot_id}_{fid}")
+                                pf_width = persistent_input(st.number_input, f"pfit_width_{plot_id}_{fid}", label="Width", value=3.0, step=0.5)
                             
                             c_ax, c_ay, c_btn = st.columns([1, 1, 1])
                             with c_ax: pf_annot_x = persistent_input(st.number_input, f"pfit_ax_{plot_id}_{fid}", label="Annot X", value=None, placeholder="Auto", format=x_fmt, step=x_step)
                             with c_ay: pf_annot_y = persistent_input(st.number_input, f"pfit_ay_{plot_id}_{fid}", label="Annot Y", value=None, placeholder="Auto", format=y_fmt, step=y_step)
                             with c_btn:
-                                st.write("")
-                                st.write("")
+                                last_click = st.session_state.get(f"last_click_{plot_id}")
+                                if last_click:
+                                    st.caption(f"Sel: {x_fmt % last_click['x']}, {y_fmt % last_click['y']}")
+                                else:
+                                    st.caption("No point selected")
                                 
                                 st.button("📍 Paste", key=f"paste_pfit_{plot_id}_{fid}", help="Paste clicked coordinates", 
                                           on_click=perform_paste, 
                                           args=(plot_id, f"pfit_ax_{plot_id}_{fid}", f"pfit_ay_{plot_id}_{fid}", True))
 
-                            parabolic_fit_settings[fid] = {"color": pf_color, "annot_x": pf_annot_x, "annot_y": pf_annot_y}
+                            parabolic_fit_settings[fid] = {"color": pf_color, "annot_x": pf_annot_x, "annot_y": pf_annot_y, "style": pf_style, "width": pf_width}
 
         # --- TAB 3: STYLING ---
         with tab_style:
@@ -782,7 +806,12 @@ def create_plot_interface(plot_id: str, available_datasets: List[Dict[str, Any]]
                     if len(xf) > 1:
                         slope, intercept = np.polyfit(xf, yf, 1)
                         y_fit = slope * xf + intercept
-                        fig.add_trace(go.Scatter(x=xf, y=y_fit, mode='lines', name=f"Fit {legend_name}", line=dict(dash='dash', width=2, color=fit_cfg.get('color', 'red')), hoverinfo='skip'))
+                        
+                        f_col = fit_cfg.get('color', 'red')
+                        f_sty = fit_cfg.get('style', 'dash')
+                        f_wid = fit_cfg.get('width', 2.0)
+                        
+                        fig.add_trace(go.Scatter(x=xf, y=y_fit, mode='lines', name=f"Linear Fit {legend_name}", line=dict(dash=f_sty, width=f_wid, color=f_col), hoverinfo='skip'))
                         
                         annot_x_f = fit_cfg.get('annot_x')
                         annot_y_f = fit_cfg.get('annot_y')
@@ -791,7 +820,7 @@ def create_plot_interface(plot_id: str, available_datasets: List[Dict[str, Any]]
                             annot_x_f, annot_y_f, ay_offset = xf.iloc[mid_idx], y_fit.iloc[mid_idx], -40
                         else: ay_offset = 0
                         
-                        fig.add_annotation(x=annot_x_f, y=annot_y_f, text=f"<b>y = {slope:.3e} x + {intercept:.3e}</b>", showarrow=True, arrowhead=2, arrowsize=1, arrowwidth=2, ax=0, ay=ay_offset, bgcolor="rgba(255, 255, 255, 0.8)", bordercolor="black", borderwidth=1, font=dict(size=14, color="black"))
+                        fig.add_annotation(x=annot_x_f, y=annot_y_f, text=f"<b>y = {slope:.3e} x + {intercept:.3e}</b>", showarrow=True, arrowhead=2, arrowsize=1, arrowwidth=2, arrowcolor=f_col, ax=0, ay=ay_offset, bgcolor="rgba(255, 255, 255, 0.8)", bordercolor=f_col, borderwidth=1, font=dict(size=14, color=f_col))
 
                 # Parabolic Fit
                 if show_parabolic_fit and d['id'] in parabolic_fit_settings and x_data is not None and y_data is not None:
@@ -804,7 +833,12 @@ def create_plot_interface(plot_id: str, available_datasets: List[Dict[str, Any]]
                     if len(xpf) > 2:
                         a, b, c = np.polyfit(xpf, ypf, 2)
                         y_pfit = a * xpf**2 + b * xpf + c
-                        fig.add_trace(go.Scatter(x=xpf, y=y_pfit, mode='lines', name=f"ParaFit {legend_name}", line=dict(dash='dot', width=3, color=pfit_cfg.get('color', 'green')), hoverinfo='skip'))
+                        
+                        pf_col = pfit_cfg.get('color', 'green')
+                        pf_sty = pfit_cfg.get('style', 'dot')
+                        pf_wid = pfit_cfg.get('width', 3.0)
+                        
+                        fig.add_trace(go.Scatter(x=xpf, y=y_pfit, mode='lines', name=f"Parabolic Fit {legend_name}", line=dict(dash=pf_sty, width=pf_wid, color=pf_col), hoverinfo='skip'))
                         
                         annot_x_pf = pfit_cfg.get('annot_x')
                         annot_y_pf = pfit_cfg.get('annot_y')
@@ -813,7 +847,7 @@ def create_plot_interface(plot_id: str, available_datasets: List[Dict[str, Any]]
                             annot_x_pf, annot_y_pf, ay_offset = xpf.iloc[mid_idx], y_pfit.iloc[mid_idx], 40
                         else: ay_offset = 0
 
-                        fig.add_annotation(x=annot_x_pf, y=annot_y_pf, text=f"<b>y = {a:.2e} x² + {b:.2e} x + {c:.2e}</b>", showarrow=True, arrowhead=2, arrowsize=1, arrowwidth=2, ax=0, ay=ay_offset, bgcolor="rgba(255, 255, 255, 0.8)", bordercolor=pfit_cfg.get('color', 'green'), borderwidth=1, font=dict(size=14, color=pfit_cfg.get('color', 'green')))
+                        fig.add_annotation(x=annot_x_pf, y=annot_y_pf, text=f"<b>y = {a:.2e} x² + {b:.2e} x + {c:.2e}</b>", showarrow=True, arrowhead=2, arrowsize=1, arrowwidth=2, arrowcolor=pf_col, ax=0, ay=ay_offset, bgcolor="rgba(255, 255, 255, 0.8)", bordercolor=pf_col, borderwidth=1, font=dict(size=14, color=pf_col))
 
                 clean_label = d['label'].replace(" ", "_") + suffix.replace(" ", "_").replace("(", "").replace(")", "")
                 export_data[f"{clean_label}_X"] = x_data.values
