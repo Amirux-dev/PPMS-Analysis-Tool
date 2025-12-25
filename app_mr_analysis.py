@@ -70,8 +70,6 @@ with st.sidebar.expander("💾 Project Management", expanded=False):
         st.toast(f"Imported {len(uploaded_projs)} projects!", icon="📥")
         st.rerun()
 
-    st.markdown("---")
-
     # 2. Project Selector
     projects = list_projects()
     active_proj = st.session_state.get('active_project')
@@ -118,8 +116,6 @@ with st.sidebar.expander("💾 Project Management", expanded=False):
                 st.session_state.active_project = None
                 st.rerun()
 
-    st.markdown("---")
-
     # 4. Save / Download Logic
     if active_proj:
         st.caption(f"Editing: **{active_proj}**")
@@ -162,7 +158,6 @@ with st.sidebar.expander("💾 Project Management", expanded=False):
 
     # Export Data (ZIP)
     if st.session_state.all_datasets:
-        st.markdown("---")
         st.markdown("**Export Data**")
         
         # Prepare ZIP on the fly
