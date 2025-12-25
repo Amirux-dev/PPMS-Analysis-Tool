@@ -207,25 +207,7 @@ with st.sidebar.expander("💾 Project Management", expanded=False):
             use_container_width=True
         )
 
-    st.markdown("---")
-    
-    # Load Project
-    st.markdown("**Load Project**")
-    
-    # Use dynamic key to allow clearing the uploader after successful load
-    loader_key = f"proj_loader_{st.session_state.get('project_loader_key', 0)}"
-    
-    uploaded_project = st.file_uploader("Load Project", type=["ppms", "pkl"], key=loader_key, label_visibility="collapsed")
-    if uploaded_project is not None:
-        try:
-            loaded_state = pickle.load(uploaded_project)
-            if apply_loaded_state(loaded_state):
-                st.success("Project loaded successfully!")
-                # Increment key to clear uploader on next run
-                st.session_state.project_loader_key = st.session_state.get('project_loader_key', 0) + 1
-                st.rerun()
-        except Exception as e:
-            st.error(f"Error loading project: {e}")
+
 
 # --- Sidebar: Data Manager ---
 st.sidebar.header("Data Manager")
