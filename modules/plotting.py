@@ -731,6 +731,8 @@ def create_plot_interface(plot_id: str, available_datasets: List[Dict[str, Any]]
 
             if analysis_mode in ["Standard MR Analysis", "Standard R-H Analysis"]:
                 df_base = pd.DataFrame({"H_T": d["H_T"], "R": d["R"]})
+                if df_base.empty: continue
+                
                 dfs_to_process = [(df_base, "")]
                 if d['id'] in symmetrize_files:
                     df_sym = df_base.copy()
@@ -738,13 +740,18 @@ def create_plot_interface(plot_id: str, available_datasets: List[Dict[str, Any]]
                     dfs_to_process.append((df_sym, " (Sym)"))
 
                 for df, suffix in dfs_to_process:
+                    if df.empty: continue
+                    
                     r0 = 1.0
-                    if r0_method == "First Point": r0 = df["R"].iloc[0]
-                    elif r0_method == "Closest to 0T": r0 = df["R"].iloc[df["H_T"].abs().idxmin()]
-                    elif r0_method == "Mean within Window":
-                        mask = df["H_T"].abs() <= r0_window
-                        r0 = df.loc[mask, "R"].mean() if mask.any() else df["R"].iloc[df["H_T"].abs().idxmin()]
-                    elif r0_method == "Max Resistance": r0 = df["R"].max()
+                    try:
+                        if r0_method == "First Point": r0 = df["R"].iloc[0]
+                        elif r0_method == "Closest to 0T": r0 = df["R"].iloc[df["H_T"].abs().idxmin()]
+                        elif r0_method == "Mean within Window":
+                            mask = df["H_T"].abs() <= r0_window
+                            r0 = df.loc[mask, "R"].mean() if mask.any() else df["R"].iloc[df["H_T"].abs().idxmin()]
+                        elif r0_method == "Max Resistance": r0 = df["R"].max()
+                    except Exception:
+                        r0 = 1.0 # Fallback
 
                     x_d, x_l = df["H_T"], "Field (T)"
                     if x_axis_unit == "Oersted (Oe)": x_d, x_l = x_d * 10000, "Field (Oe)"
@@ -770,12 +777,17 @@ def create_plot_interface(plot_id: str, available_datasets: List[Dict[str, Any]]
                 if r_col not in full_df.columns: continue
                 
                 df = pd.DataFrame({"T": full_df[temp_col], "R": full_df[r_col]}).dropna().sort_values("T")
+                if df.empty: continue
+                
                 x_data, x_label = df["T"], "Temperature (K)"
                 y_data, y_label = None, ""
 
                 if y_axis_mode == "Resistance (Ω)": y_data, y_label = df["R"], "Resistance (Ω)"
                 elif y_axis_mode == "Normalized (R/R_300K)":
-                    r_300 = df.loc[(df["T"] - 300).abs().idxmin(), "R"]
+                    try:
+                        r_300 = df.loc[(df["T"] - 300).abs().idxmin(), "R"]
+                    except Exception:
+                        r_300 = 1.0
                     y_data, y_label = df["R"] / r_300, "R / R(300K)"
                 elif y_axis_mode == "Derivative (dR/dT)":
                     y_data, y_label = (df["R"].diff() / df["T"].diff()).fillna(0), "dR/dT (Ω/K)"

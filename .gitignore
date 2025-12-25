@@ -10,3 +10,5 @@ venv/
 # IDEs
 .idea/
 .vscode/
+
+session_state.pkl
