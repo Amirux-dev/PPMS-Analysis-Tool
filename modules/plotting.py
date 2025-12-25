@@ -10,6 +10,39 @@ from modules.data_processing import choose_temperature_column
 # PLOTTING INTERFACE
 # -----------------------------------------------------------------------------
 
+def perform_paste(plot_id, key_x, key_y, is_persistent_widget=False):
+    """
+    Helper to paste last clicked coordinates into widgets.
+    Handles both standard widgets and persistent_input widgets.
+    """
+    lc = st.session_state.get(f"last_click_{plot_id}")
+    if not lc: return
+
+    val_x = lc["x"]
+    val_y = lc["y"]
+
+    if is_persistent_widget:
+        # Logic for persistent_input widgets
+        if 'persistent_values' not in st.session_state:
+            st.session_state['persistent_values'] = {}
+        
+        # 1. Update the persistent store
+        st.session_state['persistent_values'][key_x] = val_x
+        st.session_state['persistent_values'][key_y] = val_y
+        
+        # 2. Update the actual widget key to prevent persistent_input from overwriting the store
+        #    with the old widget value on the next run.
+        uploader_key = st.session_state.get('uploader_key', 0)
+        wkey_x = f"{key_x}_{uploader_key}"
+        wkey_y = f"{key_y}_{uploader_key}"
+        
+        st.session_state[wkey_x] = val_x
+        st.session_state[wkey_y] = val_y
+    else:
+        # Logic for standard widgets
+        st.session_state[key_x] = val_x
+        st.session_state[key_y] = val_y
+
 def add_plot_callback():
     existing_ids = set(st.session_state.plot_ids)
     new_id = 1
@@ -431,14 +464,9 @@ def create_plot_interface(plot_id: str, available_datasets: List[Dict[str, Any]]
                                 st.write("")
                                 st.write("")
                                 
-                                def paste_fit_callback(pid, fid):
-                                    lc = st.session_state.get(f"last_click_{pid}")
-                                    if lc:
-                                        if 'persistent_values' not in st.session_state: st.session_state['persistent_values'] = {}
-                                        st.session_state['persistent_values'][f"fit_ax_{pid}_{fid}"] = lc["x"]
-                                        st.session_state['persistent_values'][f"fit_ay_{pid}_{fid}"] = lc["y"]
-
-                                st.button("📍 Paste", key=f"paste_fit_{plot_id}_{fid}", help="Paste clicked coordinates", on_click=paste_fit_callback, args=(plot_id, fid))
+                                st.button("📍 Paste", key=f"paste_fit_{plot_id}_{fid}", help="Paste clicked coordinates", 
+                                          on_click=perform_paste, 
+                                          args=(plot_id, f"fit_ax_{plot_id}_{fid}", f"fit_ay_{plot_id}_{fid}", True))
 
                             linear_fit_settings[fid] = {"color": f_color, "annot_x": f_annot_x, "annot_y": f_annot_y}
                 
@@ -470,14 +498,9 @@ def create_plot_interface(plot_id: str, available_datasets: List[Dict[str, Any]]
                                 st.write("")
                                 st.write("")
                                 
-                                def paste_pfit_callback(pid, fid):
-                                    lc = st.session_state.get(f"last_click_{pid}")
-                                    if lc:
-                                        if 'persistent_values' not in st.session_state: st.session_state['persistent_values'] = {}
-                                        st.session_state['persistent_values'][f"pfit_ax_{pid}_{fid}"] = lc["x"]
-                                        st.session_state['persistent_values'][f"pfit_ay_{pid}_{fid}"] = lc["y"]
-
-                                st.button("📍 Paste", key=f"paste_pfit_{plot_id}_{fid}", help="Paste clicked coordinates", on_click=paste_pfit_callback, args=(plot_id, fid))
+                                st.button("📍 Paste", key=f"paste_pfit_{plot_id}_{fid}", help="Paste clicked coordinates", 
+                                          on_click=perform_paste, 
+                                          args=(plot_id, f"pfit_ax_{plot_id}_{fid}", f"pfit_ay_{plot_id}_{fid}", True))
 
                             parabolic_fit_settings[fid] = {"color": pf_color, "annot_x": pf_annot_x, "annot_y": pf_annot_y}
 
@@ -588,13 +611,9 @@ def create_plot_interface(plot_id: str, available_datasets: List[Dict[str, Any]]
                         else:
                             st.caption("No point selected")
                         
-                        def paste_callback(pid, idx):
-                            lc = st.session_state.get(f"last_click_{pid}")
-                            if lc:
-                                st.session_state[f"annot_x_{pid}_{idx}"] = lc["x"]
-                                st.session_state[f"annot_y_{pid}_{idx}"] = lc["y"]
-
-                        st.button("📍 Paste Click", key=f"paste_click_{plot_id}_{i}", help=help_text, on_click=paste_callback, args=(plot_id, i))
+                        st.button("📍 Paste Click", key=f"paste_click_{plot_id}_{i}", help=help_text, 
+                                  on_click=perform_paste, 
+                                  args=(plot_id, f"annot_x_{plot_id}_{i}", f"annot_y_{plot_id}_{i}", False))
 
                     c_col, c_size = st.columns(2)
                     with c_col:
