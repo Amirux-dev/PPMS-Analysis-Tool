@@ -60,26 +60,44 @@ with st.sidebar.expander("💾 Project Management", expanded=False):
     st.caption("Save or Load your entire analysis session.")
     
     # Save Project
+    st.markdown("**Save Project**")
+    col_name, col_btn = st.columns([0.6, 0.4])
+    with col_name:
+        project_name = st.text_input("Filename", value="analysis_project", key="proj_save_name", label_visibility="collapsed")
+    
+    if not project_name.endswith(".ppms"):
+        project_name += ".ppms"
+        
     state_dict = get_current_state_dict()
     try:
         pickle_data = pickle.dumps(state_dict)
-        st.download_button(
-            label="📥 Save Project (.ppms)",
-            data=pickle_data,
-            file_name="analysis_project.ppms",
-            mime="application/octet-stream",
-            help="Download a file containing all your data, plots, and settings."
-        )
+        with col_btn:
+            st.download_button(
+                label="📥 Save",
+                data=pickle_data,
+                file_name=project_name,
+                mime="application/octet-stream",
+                help="Download a file containing all your data, plots, and settings."
+            )
     except Exception as e:
         st.error(f"Error preparing download: {e}")
         
+    st.markdown("---")
+    
     # Load Project
-    uploaded_project = st.file_uploader("Load Project", type=["ppms", "pkl"], label_visibility="collapsed")
+    st.markdown("**Load Project**")
+    
+    # Use dynamic key to allow clearing the uploader after successful load
+    loader_key = f"proj_loader_{st.session_state.get('project_loader_key', 0)}"
+    
+    uploaded_project = st.file_uploader("Load Project", type=["ppms", "pkl"], key=loader_key, label_visibility="collapsed")
     if uploaded_project is not None:
         try:
             loaded_state = pickle.load(uploaded_project)
             if apply_loaded_state(loaded_state):
                 st.success("Project loaded successfully!")
+                # Increment key to clear uploader on next run
+                st.session_state.project_loader_key = st.session_state.get('project_loader_key', 0) + 1
                 st.rerun()
         except Exception as e:
             st.error(f"Error loading project: {e}")

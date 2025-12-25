@@ -110,6 +110,7 @@ def init_session_state():
     defaults = {
         'all_datasets': [],
         'uploader_key': 0,
+        'project_loader_key': 0,
         'batch_counter': 0,
         'plot_ids': [1],
         'next_plot_id': 2,
