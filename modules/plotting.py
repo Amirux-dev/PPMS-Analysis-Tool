@@ -387,6 +387,88 @@ def create_plot_interface(plot_id: str, available_datasets: List[Dict[str, Any]]
 
                             parabolic_fit_settings[fid] = {"color": pf_color, "annot_x": pf_annot_x, "annot_y": pf_annot_y}
 
+        # --- PRE-CALCULATE DATA RANGES FOR ANNOTATION SCALING ---
+        global_x_min, global_x_max = float('inf'), float('-inf')
+        global_y_min, global_y_max = float('inf'), float('-inf')
+        
+        # We need to do a quick pass to estimate ranges without full plotting overhead
+        # This is a simplified version of the plotting loop logic just for ranges
+        if selected_datasets:
+            for d in selected_datasets:
+                # Simplified logic to extract X/Y based on mode
+                x_temp, y_temp = None, None
+                
+                if analysis_mode in ["Standard MR Analysis", "Standard R-H Analysis"]:
+                    df = pd.DataFrame({"H_T": d["H_T"], "R": d["R"]})
+                    r0 = 1.0
+                    if r0_method == "First Point": r0 = df["R"].iloc[0]
+                    elif r0_method == "Closest to 0T": r0 = df["R"].iloc[df["H_T"].abs().idxmin()]
+                    elif r0_method == "Mean within Window":
+                        mask = df["H_T"].abs() <= r0_window
+                        r0 = df.loc[mask, "R"].mean() if mask.any() else df["R"].iloc[df["H_T"].abs().idxmin()]
+                    elif r0_method == "Max Resistance": r0 = df["R"].max()
+
+                    x_temp = df["H_T"] * (10000 if x_axis_unit == "Oersted (Oe)" else 1)
+                    if y_axis_mode == "Magnetoresistance (MR %)": y_temp = 100 * (df["R"] - r0) / r0
+                    elif y_axis_mode == "Normalized (R/R0)": y_temp = df["R"] / r0
+                    elif y_axis_mode == "Derivative (dR/dH)": y_temp = df["R"].diff() / df["H_T"].diff()
+                    else: y_temp = df["R"]
+                
+                elif analysis_mode == "Standard R-T Analysis":
+                    if 'full_df' in d and d['rCol'] in d['full_df'].columns:
+                        full_df = d['full_df']
+                        cols = full_df.columns.tolist()
+                        temp_idx = choose_temperature_column(cols)
+                        if temp_idx >= 0:
+                            df = pd.DataFrame({"T": full_df[cols[temp_idx]], "R": full_df[d['rCol']]}).dropna()
+                            x_temp = df["T"]
+                            if y_axis_mode == "Resistance (Ω)": y_temp = df["R"]
+                            elif y_axis_mode == "Normalized (R/R_300K)":
+                                r_300 = df.loc[(df["T"] - 300).abs().idxmin(), "R"]
+                                y_temp = df["R"] / r_300
+                            elif y_axis_mode == "Derivative (dR/dT)": y_temp = df["R"].diff() / df["T"].diff()
+
+                else: # Custom
+                    if 'full_df' in d:
+                        full_df = d['full_df']
+                        # Helper to get col data (simplified)
+                        def get_col_simple(cname, df):
+                            if cname == "Magnetic Field (T)":
+                                for c in df.columns:
+                                    if "Oe" in c or "Oersted" in c: return df[c] * 1e-4
+                                return None
+                            return df[cname] if cname in df.columns else None
+                        
+                        x_temp = get_col_simple(custom_x_col, full_df)
+                        y_temp = get_col_simple(custom_y_col, full_df)
+                        if plot_derivative and x_temp is not None and y_temp is not None:
+                             # Very rough derivative range estimation
+                             temp_df = pd.DataFrame({'x': x_temp, 'y': y_temp}).sort_values('x')
+                             y_temp = temp_df['y'].diff() / temp_df['x'].diff()
+
+                if x_temp is not None and not x_temp.empty:
+                    global_x_min = min(global_x_min, x_temp.min())
+                    global_x_max = max(global_x_max, x_temp.max())
+                if y_temp is not None and not y_temp.empty:
+                    global_y_min = min(global_y_min, y_temp.min())
+                    global_y_max = max(global_y_max, y_temp.max())
+
+        # Default ranges if no data
+        if global_x_min == float('inf'): global_x_min, global_x_max = -10.0, 10.0
+        if global_y_min == float('inf'): global_y_min, global_y_max = 0.0, 100.0
+
+        # Determine format string based on range
+        def get_smart_format(val_min, val_max):
+            val_range = abs(val_max - val_min)
+            if val_range == 0: return "%.4f"
+            if val_range < 1e-3: return "%.4e"
+            if val_range < 1: return "%.6f"
+            if val_range > 1000: return "%.2f"
+            return "%.4f"
+
+        x_fmt = get_smart_format(global_x_min, global_x_max)
+        y_fmt = get_smart_format(global_y_min, global_y_max)
+
         # --- TAB 3: STYLING ---
         with tab_style:
             st.markdown("###### Curve Styling")
@@ -483,9 +565,9 @@ def create_plot_interface(plot_id: str, available_datasets: List[Dict[str, Any]]
                     
                     c_xy1, c_xy2, c_btn = st.columns([1, 1, 1], vertical_alignment="bottom")
                     with c_xy1:
-                        annot["x"] = st.number_input("X", value=float(annot["x"]), format="%.4f", key=f"annot_x_{plot_id}_{i}")
+                        annot["x"] = st.number_input("X", value=float(annot["x"]), format=x_fmt, key=f"annot_x_{plot_id}_{i}")
                     with c_xy2:
-                        annot["y"] = st.number_input("Y", value=float(annot["y"]), format="%.4f", key=f"annot_y_{plot_id}_{i}")
+                        annot["y"] = st.number_input("Y", value=float(annot["y"]), format=y_fmt, key=f"annot_y_{plot_id}_{i}")
                     with c_btn:
                         last_click = st.session_state.get(f"last_click_{plot_id}")
                         help_text = "1. Click a data point on the plot.\n2. Click this button to paste coordinates."
