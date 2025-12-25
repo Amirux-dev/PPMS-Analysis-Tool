@@ -1,6 +1,8 @@
 import streamlit as st
 import os
 import uuid
+import zipfile
+import io
 from typing import List, Dict, Any, Optional, Tuple
 
 # Import Modules
@@ -152,6 +154,9 @@ if uploaded_files:
         try:
             content = uploaded_file.getvalue().decode("utf-8", errors="ignore")
             data = parse_multivu_content(content, fname)
+            
+            # Store original content for export
+            data['original_content'] = content
             
             data['batch_id'] = batch_id
             data['batch_name'] = batch_name 
@@ -521,6 +526,38 @@ if datasets or batches:
     if st.sidebar.button("💾 Save Analysis State", help="Force save current state to disk", width='stretch'):
         save_session_state()
         st.toast("State saved manually!", icon="💾")
+
+    # Download All Data Button
+    if datasets:
+        zip_buffer = io.BytesIO()
+        with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zf:
+            for bid, info in batches.items():
+                # Clean folder name
+                raw_name = info['name']
+                # Remove emojis and special chars for filesystem safety
+                folder_name = "".join(c for c in raw_name if c.isalnum() or c in (' ', '_', '-')).strip()
+                if not folder_name: folder_name = f"Batch_{bid}"
+                
+                for d in info['files']:
+                    fname = d['fileName']
+                    content = d.get('original_content')
+                    
+                    if content is None:
+                        # Fallback: Reconstruct CSV from DataFrame if original content is missing
+                        if 'full_df' in d:
+                            content = d['full_df'].to_csv(index=False)
+                        else:
+                            content = ""
+                    
+                    zf.writestr(f"{folder_name}/{fname}", content)
+        
+        st.sidebar.download_button(
+            label="📥 Download All Data (.zip)",
+            data=zip_buffer.getvalue(),
+            file_name="all_data.zip",
+            mime="application/zip",
+            help="Download all loaded files organized by folder."
+        )
 
     # --- Batch Actions Button ---
     if dialog_decorator:
