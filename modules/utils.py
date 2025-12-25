@@ -175,16 +175,25 @@ def load_session_state():
             st.error(f"Error loading state: {e}")
     return False
 
-def clear_session_cache():
-    """Clears the recovery file for the current session."""
-    recovery_path = get_session_file_path()
-    if recovery_path and os.path.exists(recovery_path):
-        try:
-            os.remove(recovery_path)
-            return True
-        except Exception:
-            pass
-    return False
+def reset_session_data():
+    """Resets the session state to defaults and overwrites the recovery file."""
+    # 1. Reset Core Variables
+    st.session_state.all_datasets = []
+    st.session_state.plot_ids = [1]
+    st.session_state.next_plot_id = 2
+    st.session_state.custom_batches = {}
+    st.session_state.batch_counter = 0
+    st.session_state.active_project = None
+    st.session_state.persistent_values = {}
+    
+    # 2. Clear dynamic keys (plot settings, selections, etc.)
+    keys_to_del = [k for k in st.session_state.keys() if k.startswith(("sel_", "batch_filter_", "pname_", "ren_mode_", "annotations_list_", "fit_", "last_click_"))]
+    for k in keys_to_del:
+        del st.session_state[k]
+        
+    # 3. Force Save (Overwrites the recovery file with empty state)
+    save_session_state(save_to_project=False)
+    return True
 
 def recover_session_state():
     """Recover plot_ids and next_plot_id from persistent_values if they seem lost."""

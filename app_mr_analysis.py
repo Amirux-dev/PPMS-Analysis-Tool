@@ -4,6 +4,7 @@ import uuid
 import zipfile
 import io
 import re
+import urllib.parse
 from typing import List, Dict, Any, Optional, Tuple
 
 # Import Modules
@@ -13,7 +14,7 @@ from modules.utils import (
     save_session_state, load_session_state, init_session_state, recover_session_state,
     persistent_selectbox, persistent_input, get_current_state_dict, apply_loaded_state,
     list_projects, load_project_file, save_current_project, delete_project_file, import_project_file,
-    clear_session_cache
+    reset_session_data
 )
 import pickle
 from modules.plotting import create_plot_interface, get_batch_map
@@ -77,9 +78,45 @@ with st.sidebar.expander("⚙️ General Settings", expanded=False):
     
     st.markdown("---")
     st.caption(f"Session ID: `{st.session_state.get('session_id', 'Unknown')[:8]}...`")
-    if st.button("⚠️ Reset Session", help="Clear all data and start fresh"):
-        clear_session_cache()
+    
+    # Share Session UI
+    with st.popover("🔗 Share Session", use_container_width=True):
+        sess_id = st.session_state.get('session_id', '')
+        st.markdown("### Share this Session")
+        st.text("Session ID:")
+        st.code(sess_id, language=None)
+        
+        # Mailto Link
+        subject = urllib.parse.quote("PPMS Analysis Session")
+        body_text = f"Hi,\n\nI'm working on a PPMS analysis. You can join my session using this ID:\n\n{sess_id}\n\n(Append ?session_id={sess_id} to the application URL)"
+        body = urllib.parse.quote(body_text)
+        mailto_link = f"mailto:?subject={subject}&body={body}"
+        
+        st.markdown(f"""
+        <a href="{mailto_link}" target="_blank" style="text-decoration: none;">
+            <button style="
+                width: 100%;
+                background-color: #FF4B4B;
+                color: white;
+                border: none;
+                padding: 0.5rem;
+                border-radius: 0.5rem;
+                cursor: pointer;
+                font-weight: bold;
+            ">
+                📧 Send by Email
+            </button>
+        </a>
+        """, unsafe_allow_html=True)
+
+    if st.button("⚠️ New Session", help="Generate a new unique Session ID (Start Fresh)"):
+        # Generate new ID
+        new_id = str(uuid.uuid4())
+        # Clear memory
         st.session_state.clear()
+        # Set new ID
+        st.session_state.session_id = new_id
+        st.query_params['session_id'] = new_id
         st.rerun()
 
 # --- Sidebar: Project Management ---
