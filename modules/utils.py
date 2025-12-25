@@ -12,6 +12,10 @@ import uuid
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 APP_ROOT = os.path.dirname(BASE_DIR)
 STATE_FILE = os.path.join(APP_ROOT, "session_state.pkl")
+PROJECTS_DIR = os.path.join(APP_ROOT, "projects")
+
+if not os.path.exists(PROJECTS_DIR):
+    os.makedirs(PROJECTS_DIR)
 
 def get_current_state_dict():
     """Helper to construct the state dictionary for saving."""
@@ -35,13 +39,70 @@ def get_current_state_dict():
     }
 
 def save_session_state():
-    """Saves the current session state to a local pickle file."""
+    """Saves the current session state to a local pickle file AND active project if autosave is on."""
     state_to_save = get_current_state_dict()
+    
+    # 1. Save to recovery file (fast, always happens)
     try:
         with open(STATE_FILE, 'wb') as f:
             pickle.dump(state_to_save, f)
     except Exception as e:
-        print(f"Error saving state: {e}")
+        print(f"Error saving recovery state: {e}")
+
+    # 2. Auto-save to Project File
+    active_project = st.session_state.get('active_project')
+    autosave = st.session_state.get('autosave_enabled', False)
+    
+    if active_project and autosave:
+        project_path = os.path.join(PROJECTS_DIR, active_project)
+        try:
+            with open(project_path, 'wb') as f:
+                pickle.dump(state_to_save, f)
+        except Exception as e:
+            print(f"Error auto-saving project: {e}")
+
+def list_projects():
+    """Returns list of .ppms files in projects directory."""
+    if not os.path.exists(PROJECTS_DIR): return []
+    return [f for f in os.listdir(PROJECTS_DIR) if f.endswith('.ppms')]
+
+def load_project_file(filename):
+    """Loads a specific project file."""
+    path = os.path.join(PROJECTS_DIR, filename)
+    if os.path.exists(path):
+        try:
+            with open(path, 'rb') as f:
+                saved_state = pickle.load(f)
+            return apply_loaded_state(saved_state)
+        except Exception as e:
+            st.error(f"Error loading project {filename}: {e}")
+    return False
+
+def save_current_project(filename):
+    """Manually save current state to a project file."""
+    if not filename.endswith('.ppms'):
+        filename += '.ppms'
+    
+    path = os.path.join(PROJECTS_DIR, filename)
+    state_to_save = get_current_state_dict()
+    try:
+        with open(path, 'wb') as f:
+            pickle.dump(state_to_save, f)
+        return True
+    except Exception as e:
+        st.error(f"Error saving project: {e}")
+        return False
+
+def delete_project_file(filename):
+    """Deletes a project file."""
+    path = os.path.join(PROJECTS_DIR, filename)
+    if os.path.exists(path):
+        try:
+            os.remove(path)
+            return True
+        except Exception as e:
+            st.error(f"Error deleting project: {e}")
+    return False
 
 def apply_loaded_state(saved_state):
     """Applies a loaded state dictionary to the current session."""

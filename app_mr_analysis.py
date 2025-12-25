@@ -10,7 +10,8 @@ from typing import List, Dict, Any, Optional, Tuple
 from modules.data_processing import parse_multivu_content
 from modules.utils import (
     save_session_state, load_session_state, init_session_state, recover_session_state,
-    persistent_selectbox, persistent_input, get_current_state_dict, apply_loaded_state
+    persistent_selectbox, persistent_input, get_current_state_dict, apply_loaded_state,
+    list_projects, load_project_file, save_current_project, delete_project_file
 )
 import pickle
 from modules.plotting import create_plot_interface, get_batch_map
@@ -59,31 +60,80 @@ with st.sidebar.expander("⚙️ General Settings", expanded=False):
 
 # --- Sidebar: Project Management ---
 with st.sidebar.expander("💾 Project Management", expanded=False):
-    st.caption("Save or Load your entire analysis session.")
+    # 1. Project Selector
+    projects = list_projects()
+    active_proj = st.session_state.get('active_project')
     
-    # Save Project
-    st.markdown("**Save Project**")
-    col_name, col_btn = st.columns([0.6, 0.4])
-    with col_name:
-        project_name = st.text_input("Filename", value="analysis_project", key="proj_save_name", label_visibility="collapsed")
+    # Determine index for selectbox
+    proj_index = 0
+    if active_proj in projects:
+        proj_index = projects.index(active_proj)
     
-    if not project_name.endswith(".ppms"):
-        project_name += ".ppms"
+    # Add "Unsaved Project" option if we are in a state that doesn't match any file
+    options = projects
+    if not active_proj:
+        options = ["(Unsaved Session)"] + projects
+        proj_index = 0
+    
+    selected_proj = st.selectbox(
+        "Current Project", 
+        options, 
+        index=proj_index, 
+        key="project_selector",
+        label_visibility="collapsed"
+    )
+    
+    # Handle Project Switching
+    if selected_proj != active_proj and selected_proj != "(Unsaved Session)":
+        if load_project_file(selected_proj):
+            st.session_state.active_project = selected_proj
+            st.toast(f"Loaded {selected_proj}", icon="📂")
+            st.rerun()
+
+    # 2. Project Actions
+    c_new, c_del = st.columns([0.7, 0.3])
+    with c_new:
+        if st.button("✨ New Project", width='stretch'):
+            st.session_state.all_datasets = []
+            st.session_state.plot_ids = [1]
+            st.session_state.custom_batches = {}
+            st.session_state.active_project = None
+            save_session_state() # Clear recovery file
+            st.rerun()
+            
+    with c_del:
+        if active_proj and st.button("🗑️", help="Delete current project"):
+            if delete_project_file(active_proj):
+                st.session_state.active_project = None
+                st.rerun()
+
+    st.markdown("---")
+
+    # 3. Save / Auto-save Logic
+    if active_proj:
+        st.caption(f"Editing: **{active_proj}**")
+        st.checkbox("Auto-save changes", value=True, key="autosave_enabled", help="Automatically save changes to the project file.")
         
-    state_dict = get_current_state_dict()
-    try:
-        pickle_data = pickle.dumps(state_dict)
-        with col_btn:
-            st.download_button(
-                label="📥 Save",
-                data=pickle_data,
-                file_name=project_name,
-                mime="application/octet-stream",
-                help="Download a file containing all your data, plots, and settings."
-            )
-    except Exception as e:
-        st.error(f"Error preparing download: {e}")
-        
+        if st.button("💾 Force Save", width='stretch'):
+            if save_current_project(active_proj):
+                st.toast("Project saved!", icon="✅")
+    else:
+        st.caption("Save this session as a new project:")
+        col_name, col_save = st.columns([0.65, 0.35])
+        with col_name:
+            new_proj_name = st.text_input("Name", placeholder="MyAnalysis", label_visibility="collapsed")
+        with col_save:
+            if st.button("Save", width='stretch'):
+                if new_proj_name:
+                    fname = new_proj_name if new_proj_name.endswith('.ppms') else f"{new_proj_name}.ppms"
+                    if save_current_project(fname):
+                        st.session_state.active_project = fname
+                        st.session_state.autosave_enabled = True
+                        st.toast(f"Project '{fname}' created!", icon="🎉")
+                        st.rerun()
+                else:
+                    st.error("Enter a name.")
+
     # Export Data (ZIP)
     if st.session_state.all_datasets:
         st.markdown("---")
