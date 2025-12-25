@@ -55,6 +55,34 @@ with st.sidebar.expander("⚙️ General Settings", expanded=False):
     global_field_unit = st.selectbox("Default Field Unit", ["Tesla (T)", "Oersted (Oe)"], index=0, key="global_field_unit")
     global_r0_method = st.selectbox("Default R0 Method", ["Closest to 0T", "Mean within Window", "First Point", "Max Resistance"], index=0, key="global_r0_method")
 
+# --- Sidebar: Project Management ---
+with st.sidebar.expander("💾 Project Management", expanded=False):
+    st.caption("Save or Load your entire analysis session.")
+    
+    # Save Project
+    state_dict = get_current_state_dict()
+    try:
+        pickle_data = pickle.dumps(state_dict)
+        st.download_button(
+            label="📥 Save Project (.ppms)",
+            data=pickle_data,
+            file_name="analysis_project.ppms",
+            mime="application/octet-stream",
+            help="Download a file containing all your data, plots, and settings."
+        )
+    except Exception as e:
+        st.error(f"Error preparing download: {e}")
+        
+    # Load Project
+    uploaded_project = st.file_uploader("Load Project", type=["ppms", "pkl"], label_visibility="collapsed")
+    if uploaded_project is not None:
+        try:
+            loaded_state = pickle.load(uploaded_project)
+            if apply_loaded_state(loaded_state):
+                st.success("Project loaded successfully!")
+                st.rerun()
+        except Exception as e:
+            st.error(f"Error loading project: {e}")
 
 # --- Sidebar: Data Manager ---
 st.sidebar.header("Data Manager")
@@ -572,37 +600,6 @@ if datasets or batches:
                     with c_act:
                         render_file_actions(d, bid, batches)
     
-    st.sidebar.markdown("---")
-    
-    # Project Management Section
-    with st.sidebar.expander("💾 Project Management", expanded=False):
-        st.caption("Save or Load your entire analysis session.")
-        
-        # Save Project
-        state_dict = get_current_state_dict()
-        try:
-            pickle_data = pickle.dumps(state_dict)
-            st.download_button(
-                label="📥 Save Project (.ppms)",
-                data=pickle_data,
-                file_name="analysis_project.ppms",
-                mime="application/octet-stream",
-                help="Download a file containing all your data, plots, and settings."
-            )
-        except Exception as e:
-            st.error(f"Error preparing download: {e}")
-            
-        # Load Project
-        uploaded_project = st.file_uploader("Load Project", type=["ppms", "pkl"], label_visibility="collapsed")
-        if uploaded_project is not None:
-            try:
-                loaded_state = pickle.load(uploaded_project)
-                if apply_loaded_state(loaded_state):
-                    st.success("Project loaded successfully!")
-                    st.rerun()
-            except Exception as e:
-                st.error(f"Error loading project: {e}")
-
     st.sidebar.markdown("---")
     st.sidebar.markdown("""
 **Author :** Amir MEDDAS  
