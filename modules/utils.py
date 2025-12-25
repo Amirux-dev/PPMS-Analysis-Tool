@@ -20,6 +20,19 @@ if not os.path.exists(PROJECTS_DIR):
 if not os.path.exists(CACHE_DIR):
     os.makedirs(CACHE_DIR)
 
+def get_user_projects_dir():
+    """Returns the path to the user-specific projects directory."""
+    session_id = st.session_state.get('session_id')
+    if not session_id:
+        # Fallback to a 'temp' folder if no session ID (should not happen with force rerun)
+        user_dir = os.path.join(PROJECTS_DIR, "temp_unknown_user")
+    else:
+        user_dir = os.path.join(PROJECTS_DIR, session_id)
+    
+    if not os.path.exists(user_dir):
+        os.makedirs(user_dir)
+    return user_dir
+
 def get_session_file_path():
     """Returns the path to the session-specific recovery file."""
     session_id = st.session_state.get('session_id')
@@ -68,7 +81,8 @@ def save_session_state(save_to_project=True):
         autosave = st.session_state.get('autosave_enabled', False)
         
         if active_project and autosave:
-            project_path = os.path.join(PROJECTS_DIR, active_project)
+            user_dir = get_user_projects_dir()
+            project_path = os.path.join(user_dir, active_project)
             try:
                 with open(project_path, 'wb') as f:
                     pickle.dump(state_to_save, f)
@@ -76,13 +90,15 @@ def save_session_state(save_to_project=True):
                 print(f"Error auto-saving project: {e}")
 
 def list_projects():
-    """Returns list of .ppms files in projects directory."""
-    if not os.path.exists(PROJECTS_DIR): return []
-    return [f for f in os.listdir(PROJECTS_DIR) if f.endswith('.ppms')]
+    """Returns list of .ppms files in the user's project directory."""
+    user_dir = get_user_projects_dir()
+    if not os.path.exists(user_dir): return []
+    return [f for f in os.listdir(user_dir) if f.endswith('.ppms')]
 
 def load_project_file(filename):
     """Loads a specific project file."""
-    path = os.path.join(PROJECTS_DIR, filename)
+    user_dir = get_user_projects_dir()
+    path = os.path.join(user_dir, filename)
     if os.path.exists(path):
         try:
             with open(path, 'rb') as f:
@@ -97,7 +113,8 @@ def save_current_project(filename):
     if not filename.endswith('.ppms'):
         filename += '.ppms'
     
-    path = os.path.join(PROJECTS_DIR, filename)
+    user_dir = get_user_projects_dir()
+    path = os.path.join(user_dir, filename)
     state_to_save = get_current_state_dict()
     try:
         with open(path, 'wb') as f:
@@ -109,7 +126,8 @@ def save_current_project(filename):
 
 def delete_project_file(filename):
     """Deletes a project file."""
-    path = os.path.join(PROJECTS_DIR, filename)
+    user_dir = get_user_projects_dir()
+    path = os.path.join(user_dir, filename)
     if os.path.exists(path):
         try:
             os.remove(path)
@@ -218,7 +236,9 @@ def import_project_file(filename, content):
     """Saves uploaded content to the projects directory."""
     if not filename.endswith('.ppms'):
         filename += '.ppms'
-    path = os.path.join(PROJECTS_DIR, filename)
+    
+    user_dir = get_user_projects_dir()
+    path = os.path.join(user_dir, filename)
     try:
         with open(path, 'wb') as f:
             f.write(content)
