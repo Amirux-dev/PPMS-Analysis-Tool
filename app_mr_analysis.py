@@ -575,9 +575,7 @@ if datasets or batches:
     st.sidebar.markdown("""
 **Author :** Amir MEDDAS  
 *LPS - Laboratoire de Physique des Solides*                                              
-*C2N - Centre de Nanosciences et de Nanotechnologies*    
-                        
-
+*C2N - Centre de Nanosciences et de Nanotechnologies*     
 """)
 
 else:
@@ -587,8 +585,6 @@ else:
 **Author :** Amir MEDDAS  
 *LPS - Laboratoire de Physique des Solides*                                                                
 *C2N - Centre de Nanosciences et de Nanotechnologies*  
-                        
-
 """)
     st.stop()
 
