@@ -125,54 +125,42 @@ def create_plot_interface(plot_id: str, available_datasets: List[Dict[str, Any]]
     """Creates a self-contained plotting interface and returns the figure."""
     
     with st.container(border=True):
+        # --- Header Row ---
         c_title, c_ren, c_add, c_rem, c_dup = st.columns([1.7, 1, 1, 1, 1], vertical_alignment="center", gap="small")
         
         with c_title:
             p_key = f"pname_{plot_id}"
-            
             if 'persistent_values' in st.session_state and p_key in st.session_state['persistent_values']:
                 plot_name = st.session_state['persistent_values'][p_key]
             else:
                 plot_name = st.session_state.get(p_key, f"Plot {plot_id}")
 
             if st.session_state.get(f"ren_mode_{plot_id}", False):
-                if p_key not in st.session_state:
-                     st.session_state[p_key] = plot_name
-                     
+                if p_key not in st.session_state: st.session_state[p_key] = plot_name
                 st.text_input("Name", value=plot_name, key=p_key, label_visibility="collapsed", on_change=close_rename_callback, args=(plot_id,))
             else:
                 st.markdown(f"<h3 style='margin: 0; padding: 0; line-height: 1.5;'>{plot_name}</h3>", unsafe_allow_html=True)
         
-        with c_ren:
-            st.button("✏️", key=f"ren_btn_{plot_id}", help="Rename Plot", on_click=toggle_rename_callback, args=(plot_id,), use_container_width=True)
-        with c_add:
-            st.button("➕", key=f"add_btn_{plot_id}", help="Add a new plot", on_click=add_plot_callback, use_container_width=True)
-        with c_rem:
-            st.button("➖", key=f"del_btn_{plot_id}", help="Remove this plot", on_click=remove_plot_callback, args=(plot_id,), use_container_width=True)
-        with c_dup:
-            st.button("📋", key=f"dup_{plot_id}", help="Duplicate this plot", on_click=duplicate_plot_callback, args=(plot_id,), use_container_width=True)
+        with c_ren: st.button("✏️", key=f"ren_btn_{plot_id}", help="Rename Plot", on_click=toggle_rename_callback, args=(plot_id,), use_container_width=True)
+        with c_add: st.button("➕", key=f"add_btn_{plot_id}", help="Add a new plot", on_click=add_plot_callback, use_container_width=True)
+        with c_rem: st.button("➖", key=f"del_btn_{plot_id}", help="Remove this plot", on_click=remove_plot_callback, args=(plot_id,), use_container_width=True)
+        with c_dup: st.button("📋", key=f"dup_{plot_id}", help="Duplicate this plot", on_click=duplicate_plot_callback, args=(plot_id,), use_container_width=True)
         
-        analysis_mode = persistent_selectbox(
-            "Analysis Mode",
-            ["Custom Columns", "Standard MR Analysis", "Standard R-T Analysis"],
-            index=0,
-            persistent_key=f"mode_{plot_id}"
-        )
+        # --- Global Settings for this Plot ---
+        analysis_mode = persistent_selectbox("Analysis Mode", ["Custom Columns", "Standard MR Analysis", "Standard R-T Analysis"], index=0, persistent_key=f"mode_{plot_id}")
         
+        # --- Batch & File Selection ---
         batch_map = get_batch_map(available_datasets, st.session_state.get('custom_batches', {}))
-        
         batch_ids = sorted(batch_map.keys())
         options = ["ALL"] + batch_ids
         
         def format_batch(option):
-            if option == "ALL":
-                return "All Folders"
-            return batch_map.get(option, f"Batch {option}")
+            return "All Folders" if option == "ALL" else batch_map.get(option, f"Batch {option}")
 
         persistent_batch_key = f"batch_filter_{plot_id}"
-        
         current_val = st.session_state.get(persistent_batch_key)
         
+        # Validate batch selection
         if (isinstance(current_val, str) and current_val != "ALL" and current_val not in options) or (current_val not in options and current_val is not None):
             found_id = "ALL"
             if isinstance(current_val, str):
@@ -186,29 +174,16 @@ def create_plot_interface(plot_id: str, available_datasets: List[Dict[str, Any]]
              st.session_state[persistent_batch_key] = "ALL"
              
         widget_batch_key = f"batch_filter_{plot_id}_{st.session_state.uploader_key}"
-        
         if widget_batch_key in st.session_state:
             st.session_state[persistent_batch_key] = st.session_state[widget_batch_key]
             
-        selected_batch_id = st.selectbox(
-            "Filter by Folder", 
-            options, 
-            format_func=format_batch,
-            index=options.index(st.session_state[persistent_batch_key]),
-            key=widget_batch_key,
-            on_change=save_session_state
-        )
+        selected_batch_id = st.selectbox("Filter by Folder", options, format_func=format_batch, index=options.index(st.session_state[persistent_batch_key]), key=widget_batch_key, on_change=save_session_state)
         
-        if selected_batch_id != "ALL":
-            filtered_datasets = [d for d in available_datasets if d.get('batch_id') == selected_batch_id]
-        else:
-            filtered_datasets = available_datasets
-
+        filtered_datasets = [d for d in available_datasets if d.get('batch_id') == selected_batch_id] if selected_batch_id != "ALL" else available_datasets
         filtered_filenames = [d['fileName'] for d in filtered_datasets]
         
         persistent_sel_key = f"sel_{plot_id}"
         current_selection = st.session_state.get(persistent_sel_key, [])
-        
         all_existing_files = {d['fileName'] for d in available_datasets}
         valid_selection = [f for f in current_selection if f in all_existing_files]
         
@@ -217,576 +192,350 @@ def create_plot_interface(plot_id: str, available_datasets: List[Dict[str, Any]]
             current_selection = valid_selection
         
         combined_options = sorted(list(set(filtered_filenames + current_selection)))
-        
-        # Dynamic Widget Key for Multiselect
-        # We append uploader_key to force the widget to re-mount when new files are added.
-        # Without this, the 'options' list updates but the widget might not refresh its internal state correctly.
         widget_sel_key = f"sel_{plot_id}_{st.session_state.uploader_key}"
         
         if widget_sel_key in st.session_state:
             st.session_state[persistent_sel_key] = st.session_state[widget_sel_key]
         
-        selected_filenames = st.multiselect(
-            f"Select Curves for Plot {plot_id}", 
-            options=combined_options,
-            default=current_selection,
-            key=widget_sel_key,
-            on_change=save_session_state
-        )
-        
+        selected_filenames = st.multiselect(f"Select Curves for Plot {plot_id}", options=combined_options, default=current_selection, key=widget_sel_key, on_change=save_session_state)
         selected_datasets = [d for d in available_datasets if d['fileName'] in selected_filenames]
-        
-        c1, c2 = st.columns([2, 1])
-        
-        custom_x_col = None
-        custom_y_col = None
-        
-        if analysis_mode in ["Standard MR Analysis", "Standard R-H Analysis"]:
-            # R0 Method
-            # Use Global Default if available
-            default_r0_idx = 0
-            global_r0 = st.session_state.get("global_r0_method")
-            r0_options = ["Closest to 0T", "Mean within Window", "First Point", "Max Resistance"]
-            if global_r0 in r0_options:
-                default_r0_idx = r0_options.index(global_r0)
 
-            r0_method = persistent_selectbox(
-                "R0 Calculation Method",
-                r0_options,
-                index=default_r0_idx,
-                persistent_key=f"r0_meth_{plot_id}"
-            )
-            r0_window = 0.01
-            if r0_method == "Mean within Window":
-                r0_window = st.number_input("Zero Field Window (T)", value=0.01, step=0.005, format="%.4f", key=f"r0_win_{plot_id}")
+        # --- TABS LAYOUT ---
+        tab_data, tab_analysis, tab_style, tab_export = st.tabs(["📊 Data", "📈 Analysis", "🎨 Styling", "💾 Export"])
 
-            with c1:
-                if analysis_mode == "Standard MR Analysis":
-                    y_opts = ["Magnetoresistance (MR %)", "Resistance (Ω)", "Normalized (R/R0)", "Derivative (dR/dH)"]
+        # Initialize variables to ensure scope availability
+        custom_x_col, custom_y_col = None, None
+        r0_method, r0_window = "First Point", 0.01
+        y_axis_mode, x_axis_unit = "Resistance (Ω)", "Tesla (T)"
+        
+        show_linear_fit, show_parabolic_fit = False, False
+        fit_range_min, fit_range_max = None, None
+        pfit_range_min, pfit_range_max = None, None
+        linear_fit_settings = {}
+        symmetrize_files = []
+        plot_derivative = False
+        
+        curve_settings = {}
+        custom_legends = {}
+        
+        annot_text, annot_x, annot_y, annot_color, annot_size = "", 0.0, 0.0, "#000000", 14
+        
+        custom_title, title_font_size = "", 20
+        template_mode, show_legend = "Auto (Global)", True
+        plot_mode, line_width, marker_size = "Lines", 2.0, 6
+        custom_xlabel, axis_title_size, use_xlim, xlim_min, xlim_max = "", 16, False, -9.0, 9.0
+        custom_ylabel, tick_font_size, use_ylim, ylim_min, ylim_max = "", 14, False, 0.0, 100.0
+        show_grid, grid_color = True, "#E5E5E5"
+
+        # --- TAB 1: DATA ---
+        with tab_data:
+            c1, c2 = st.columns([2, 1])
+            if analysis_mode in ["Standard MR Analysis", "Standard R-H Analysis"]:
+                # R0 Method
+                default_r0_idx = 0
+                global_r0 = st.session_state.get("global_r0_method")
+                r0_options = ["Closest to 0T", "Mean within Window", "First Point", "Max Resistance"]
+                if global_r0 in r0_options: default_r0_idx = r0_options.index(global_r0)
+
+                r0_method = persistent_selectbox("R0 Calculation Method", r0_options, index=default_r0_idx, persistent_key=f"r0_meth_{plot_id}")
+                if r0_method == "Mean within Window":
+                    r0_window = st.number_input("Zero Field Window (T)", value=0.01, step=0.005, format="%.4f", key=f"r0_win_{plot_id}")
+
+                with c1:
+                    y_opts = ["Magnetoresistance (MR %)", "Resistance (Ω)", "Normalized (R/R0)", "Derivative (dR/dH)"] if analysis_mode == "Standard MR Analysis" else ["Resistance (Ω)", "Normalized (R/R0)", "Derivative (dR/dH)"]
+                    y_axis_mode = persistent_selectbox("Y-Axis Mode", y_opts, index=0, persistent_key=f"y_mode_{plot_id}")
+                with c2:
+                    default_unit_idx = 0
+                    global_unit = st.session_state.get("global_field_unit")
+                    unit_options = ["Tesla (T)", "Oersted (Oe)"]
+                    if global_unit in unit_options: default_unit_idx = unit_options.index(global_unit)
+                    x_axis_unit = persistent_selectbox("X-Axis Unit", unit_options, index=default_unit_idx, persistent_key=f"x_unit_{plot_id}")
+            
+            elif analysis_mode == "Standard R-T Analysis":
+                with c1:
+                    y_axis_mode = persistent_selectbox("Y-Axis Mode", ["Resistance (Ω)", "Normalized (R/R_300K)", "Derivative (dR/dT)"], index=0, persistent_key=f"y_mode_{plot_id}")
+                with c2:
+                    st.selectbox("X-Axis", ["Temperature (K)"], disabled=True, key=f"x_unit_{plot_id}")
+            
+            else: # Custom Columns
+                ref_cols = []
+                if selected_datasets:
+                    df_ref = selected_datasets[0]['full_df']
+                    ref_cols = df_ref.dropna(axis=1, how='all').columns.tolist()
+                elif available_datasets:
+                    df_ref = available_datasets[0]['full_df']
+                    ref_cols = df_ref.dropna(axis=1, how='all').columns.tolist()
+
+                display_cols = list(ref_cols)
+                if any("Oe" in c or "Oersted" in c for c in ref_cols): display_cols.append("Magnetic Field (T)")
+
+                def get_smart_index(cols, keywords):
+                    for i, c in enumerate(cols):
+                        if any(k in c.lower() for k in keywords): return i
+                    return 0
+
+                default_y_idx = get_smart_index(display_cols, ["resist", "ohm", "voltage"])
+                default_x_idx = get_smart_index(display_cols, ["temp", "field", "tesla", "oe"])
+                if default_x_idx == default_y_idx and len(display_cols) > 1: default_x_idx = (default_y_idx + 1) % len(display_cols)
+
+                with c1: custom_y_col = persistent_selectbox("Y Column", display_cols, index=default_y_idx, persistent_key=f"y_col_{plot_id}")
+                with c2: custom_x_col = persistent_selectbox("X Column", display_cols, index=default_x_idx, persistent_key=f"x_col_{plot_id}")
+
+        # --- TAB 2: ANALYSIS ---
+        with tab_analysis:
+            c_fit1, c_fit2, c_proc = st.columns(3)
+            with c_fit1: show_linear_fit = persistent_input(st.toggle, f"fit_{plot_id}", label="Linear Fit", value=False, help="Fit Y = aX + b")
+            with c_fit2: show_parabolic_fit = persistent_input(st.toggle, f"pfit_{plot_id}", label="Parabolic Fit", value=False, help="Fit Y = aX² + bX + c")
+            with c_proc:
+                if analysis_mode in ["Standard MR Analysis", "Standard R-H Analysis"]:
+                    with st.popover("🪞 Symmetrize", use_container_width=True):
+                        st.markdown("Select files to symmetrize:")
+                        sym_options = {d['id']: d['fileName'] for d in selected_datasets}
+                        sym_key = f"sym_files_{plot_id}"
+                        if 'persistent_values' not in st.session_state: st.session_state['persistent_values'] = {}
+                        saved_sym = st.session_state['persistent_values'].get(sym_key, [])
+                        valid_sym = [sid for sid in saved_sym if sid in sym_options]
+                        selected_sym_ids = st.multiselect("Files", options=list(sym_options.keys()), format_func=lambda x: sym_options[x], default=valid_sym, key=f"widget_sym_{plot_id}_{st.session_state.uploader_key}", label_visibility="collapsed")
+                        if st.session_state['persistent_values'].get(sym_key) != selected_sym_ids:
+                            st.session_state['persistent_values'][sym_key] = selected_sym_ids
+                            save_session_state()
+                        symmetrize_files = selected_sym_ids
+                    plot_derivative = False
+                elif analysis_mode == "Standard R-T Analysis":
+                    plot_derivative = False
                 else:
-                    y_opts = ["Resistance (Ω)", "Normalized (R/R0)", "Derivative (dR/dH)"]
+                    plot_derivative = persistent_input(st.toggle, f"deriv_{plot_id}", label="Derivative", value=False, help="Plot dY/dX vs X")
 
-                y_axis_mode = persistent_selectbox(
-                    "Y-Axis Mode",
-                    y_opts,
-                    index=0,
-                    persistent_key=f"y_mode_{plot_id}"
-                )
-            with c2:
-                # Use Global Default for Unit
-                default_unit_idx = 0
-                global_unit = st.session_state.get("global_field_unit")
-                unit_options = ["Tesla (T)", "Oersted (Oe)"]
-                if global_unit in unit_options:
-                    default_unit_idx = unit_options.index(global_unit)
+            if show_linear_fit or show_parabolic_fit:
+                st.markdown("---")
+                st.markdown("###### Fit Settings")
+                if show_linear_fit:
+                    with st.expander("Linear Fit Configuration", expanded=True):
+                        fit_options = {d['id']: d['fileName'] for d in selected_datasets}
+                        fit_sel_key = f"fit_sel_{plot_id}"
+                        saved_fit_sel = st.session_state['persistent_values'].get(fit_sel_key, [])
+                        valid_fit_sel = [sid for sid in saved_fit_sel if sid in fit_options]
+                        selected_fit_ids = st.multiselect("Select Curves to Fit", options=list(fit_options.keys()), format_func=lambda x: fit_options[x], default=valid_fit_sel, key=f"widget_fit_sel_{plot_id}_{st.session_state.uploader_key}")
+                        
+                        if st.session_state['persistent_values'].get(fit_sel_key) != selected_fit_ids:
+                            st.session_state['persistent_values'][fit_sel_key] = selected_fit_ids
+                            save_session_state()
+                        
+                        c_fmin, c_fmax = st.columns(2)
+                        with c_fmin: fit_range_min = persistent_input(st.number_input, f"fmin_{plot_id}", label="Min X", value=None, placeholder="Start")
+                        with c_fmax: fit_range_max = persistent_input(st.number_input, f"fmax_{plot_id}", label="Max X", value=None, placeholder="End")
+                        
+                        for fid in selected_fit_ids:
+                            st.caption(f"Settings for: {fit_options[fid]}")
+                            c_fc, c_fs = st.columns(2)
+                            with c_fc: f_color = persistent_input(st.color_picker, f"fit_col_{plot_id}_{fid}", label="Line Color", value="#FF0000")
+                            c_ax, c_ay = st.columns(2)
+                            with c_ax: f_annot_x = persistent_input(st.number_input, f"fit_ax_{plot_id}_{fid}", label="Annot X", value=None, placeholder="Auto")
+                            with c_ay: f_annot_y = persistent_input(st.number_input, f"fit_ay_{plot_id}_{fid}", label="Annot Y", value=None, placeholder="Auto")
+                            linear_fit_settings[fid] = {"color": f_color, "annot_x": f_annot_x, "annot_y": f_annot_y}
+                
+                if show_parabolic_fit:
+                    with st.expander("Parabolic Fit Configuration", expanded=True):
+                        c_pmin, c_pmax = st.columns(2)
+                        with c_pmin: pfit_range_min = persistent_input(st.number_input, f"pfmin_{plot_id}", label="Min X", value=None, placeholder="Start")
+                        with c_pmax: pfit_range_max = persistent_input(st.number_input, f"pfmax_{plot_id}", label="Max X", value=None, placeholder="End")
 
-                x_axis_unit = persistent_selectbox(
-                    "X-Axis Unit",
-                    unit_options,
-                    index=default_unit_idx,
-                    persistent_key=f"x_unit_{plot_id}"
-                )
-        elif analysis_mode == "Standard R-T Analysis":
-            with c1:
-                y_axis_mode = persistent_selectbox(
-                    "Y-Axis Mode",
-                    ["Resistance (Ω)", "Normalized (R/R_300K)", "Derivative (dR/dT)"],
-                    index=0,
-                    persistent_key=f"y_mode_{plot_id}"
-                )
-            with c2:
-                st.selectbox("X-Axis", ["Temperature (K)"], disabled=True, key=f"x_unit_{plot_id}")
-        else:
-            ref_cols = []
-            
-            if selected_datasets:
-                df_ref = selected_datasets[0]['full_df']
-                valid_cols = df_ref.dropna(axis=1, how='all').columns.tolist()
-                ref_cols = valid_cols
-            elif available_datasets:
-                df_ref = available_datasets[0]['full_df']
-                valid_cols = df_ref.dropna(axis=1, how='all').columns.tolist()
-                ref_cols = valid_cols
-
-            display_cols = list(ref_cols)
-            has_oe = any("Oe" in c or "Oersted" in c for c in ref_cols)
-            if has_oe:
-                display_cols.append("Magnetic Field (T)")
-
-            def get_smart_index(cols, keywords):
-                for i, c in enumerate(cols):
-                    if any(k in c.lower() for k in keywords):
-                        return i
-                return 0
-
-            default_y_idx = get_smart_index(display_cols, ["resist", "ohm", "voltage"])
-            default_x_idx = get_smart_index(display_cols, ["temp", "field", "tesla", "oe"])
-            
-            if default_x_idx == default_y_idx and len(display_cols) > 1:
-                default_x_idx = (default_y_idx + 1) % len(display_cols)
-
-            with c1:
-                custom_y_col = persistent_selectbox("Y Column", display_cols, index=default_y_idx, persistent_key=f"y_col_{plot_id}")
-            with c2:
-                custom_x_col = persistent_selectbox("X Column", display_cols, index=default_x_idx, persistent_key=f"x_col_{plot_id}")
-            
-        st.markdown("###### Processing & Fits")
-        
-        # --- Curve Styling & Processing Popover ---
-        with st.popover("🎨 Curve Styling & Processing", use_container_width=True):
-            st.markdown("**Curve Settings**")
-            
-            curve_settings = {} # Store settings per file_id
-            
+        # --- TAB 3: STYLING ---
+        with tab_style:
+            st.markdown("###### Curve Styling")
             if not selected_datasets:
                 st.info("Select curves first.")
             else:
                 for d in selected_datasets:
-                    with st.expander(f"Settings: {d['fileName']}", expanded=False):
-                        c_col, c_smooth = st.columns(2)
-                        with c_col:
-                            # Color Picker
-                            default_color = "#000000" # Default black, Plotly will override if None/Empty but we want explicit control if user asks
-                            # We use persistent_input with color_picker
-                            curve_color = persistent_input(st.color_picker, f"color_{plot_id}_{d['id']}", label="Color", value=None)
-                        with c_smooth:
-                            # Smoothing per curve
+                    with st.expander(f"Curve: {d['fileName']}", expanded=False):
+                        c_col1, c_col2, c_col3 = st.columns([1, 1, 2])
+                        with c_col1:
+                            use_custom_color = persistent_input(st.checkbox, f"use_col_{plot_id}_{d['id']}", label="Custom Color", value=False)
+                        with c_col2:
+                            if use_custom_color:
+                                curve_color = persistent_input(st.color_picker, f"color_{plot_id}_{d['id']}", label="Pick Color", value="#000000")
+                            else:
+                                curve_color = None
+                        with c_col3:
                             curve_smooth = persistent_input(st.number_input, f"smooth_{plot_id}_{d['id']}", label="Smoothing (pts)", min_value=0, value=0, step=1)
                         
-                        curve_settings[d['id']] = {
-                            "color": curve_color,
-                            "smoothing": curve_smooth
-                        }
-
-        c_fit1, c_fit2, c_proc, c_annot = st.columns(4, vertical_alignment="bottom")
-        
-        with c_fit1:
-            show_linear_fit = persistent_input(st.toggle, f"fit_{plot_id}", label="Linear Fit", value=False, help="Fit Y = aX + b")
-        
-        with c_fit2:
-            show_parabolic_fit = persistent_input(st.toggle, f"pfit_{plot_id}", label="Parabolic Fit", value=False, help="Fit Y = aX² + bX + c")
-            
-        with c_proc:
-            symmetrize_files = []
-            if analysis_mode in ["Standard MR Analysis", "Standard R-H Analysis"]:
-                with st.popover("🪞 Symmetrize", use_container_width=True):
-                    st.markdown("Select files to symmetrize:")
-                    sym_options = {d['id']: d['fileName'] for d in selected_datasets}
-                    
-                    sym_key = f"sym_files_{plot_id}"
-                    if 'persistent_values' not in st.session_state:
-                        st.session_state['persistent_values'] = {}
-                    
-                    saved_sym = st.session_state['persistent_values'].get(sym_key, [])
-                    valid_sym = [sid for sid in saved_sym if sid in sym_options]
-                    
-                    selected_sym_ids = st.multiselect(
-                        "Files",
-                        options=list(sym_options.keys()),
-                        format_func=lambda x: sym_options[x],
-                        default=valid_sym,
-                        key=f"widget_sym_{plot_id}_{st.session_state.uploader_key}",
-                        label_visibility="collapsed"
-                    )
-                    
-                    if st.session_state['persistent_values'].get(sym_key) != selected_sym_ids:
-                        st.session_state['persistent_values'][sym_key] = selected_sym_ids
-                        save_session_state()
+                        # Legend Label
+                        default_leg = d['label']
+                        custom_leg = persistent_input(st.text_input, f"leg_{plot_id}_{d['id']}", label="Legend Label", value=default_leg)
+                        custom_legends[d['id']] = custom_leg
                         
-                    symmetrize_files = selected_sym_ids
-                
-                plot_derivative = False
-            elif analysis_mode == "Standard R-T Analysis":
-                plot_derivative = False
-            else:
-                plot_derivative = persistent_input(st.toggle, f"deriv_{plot_id}", label="Derivative", value=False, help="Plot dY/dX vs X")
-
-        with c_annot:
-             with st.popover("📝 Text", use_container_width=True):
-                st.markdown("**Add Text Annotation**")
-                annot_text = persistent_input(st.text_input, f"annot_txt_{plot_id}", label="Text", value="")
-                if annot_text:
-                    c_ax, c_ay = st.columns(2)
-                    with c_ax:
-                        annot_x = persistent_input(st.number_input, f"annot_x_{plot_id}", label="X Position", value=0.0, format="%.4f")
-                    with c_ay:
-                        annot_y = persistent_input(st.number_input, f"annot_y_{plot_id}", label="Y Position", value=0.0, format="%.4f")
-                    
-                    c_ac, c_as = st.columns(2)
-                    with c_ac:
-                        annot_color = persistent_input(st.color_picker, f"annot_col_{plot_id}", label="Color", value="#000000")
-                    with c_as:
-                        annot_size = persistent_input(st.number_input, f"annot_sz_{plot_id}", label="Size", value=14, min_value=8, max_value=50)
-
-        fit_range_min = None
-        fit_range_max = None
-        pfit_range_min = None
-        pfit_range_max = None
-        
-        # Linear Fit Settings
-        linear_fit_settings = {}
-        
-        if show_linear_fit or show_parabolic_fit:
-            with st.popover("📏 Fit Settings", width='stretch'):
-                if show_linear_fit:
-                    st.markdown("**Linear Fit Settings**")
-                    
-                    # Select curves to fit
-                    fit_options = {d['id']: d['fileName'] for d in selected_datasets}
-                    
-                    fit_sel_key = f"fit_sel_{plot_id}"
-                    saved_fit_sel = st.session_state['persistent_values'].get(fit_sel_key, [])
-                    valid_fit_sel = [sid for sid in saved_fit_sel if sid in fit_options]
-                    
-                    selected_fit_ids = st.multiselect(
-                        "Select Curves to Fit",
-                        options=list(fit_options.keys()),
-                        format_func=lambda x: fit_options[x],
-                        default=valid_fit_sel,
-                        key=f"widget_fit_sel_{plot_id}_{st.session_state.uploader_key}"
-                    )
-                    
-                    if st.session_state['persistent_values'].get(fit_sel_key) != selected_fit_ids:
-                        st.session_state['persistent_values'][fit_sel_key] = selected_fit_ids
-                        save_session_state()
-                    
-                    st.markdown("---")
-                    st.markdown("**Fit Range (X-Axis)**")
-                    c_fmin, c_fmax = st.columns(2)
-                    with c_fmin:
-                        fit_range_min = persistent_input(st.number_input, f"fmin_{plot_id}", label="Min X", value=None, placeholder="Start")
-                    with c_fmax:
-                        fit_range_max = persistent_input(st.number_input, f"fmax_{plot_id}", label="Max X", value=None, placeholder="End")
-                    st.caption("Leave empty to fit the entire range.")
-                    
-                    st.markdown("---")
-                    st.markdown("**Appearance**")
-                    for fid in selected_fit_ids:
-                        with st.expander(f"Fit: {fit_options[fid]}", expanded=False):
-                            c_fc, c_fs = st.columns(2)
-                            with c_fc:
-                                f_color = persistent_input(st.color_picker, f"fit_col_{plot_id}_{fid}", label="Line Color", value="#FF0000")
-                            
-                            st.markdown("Annotation Position")
-                            c_ax, c_ay = st.columns(2)
-                            with c_ax:
-                                f_annot_x = persistent_input(st.number_input, f"fit_ax_{plot_id}_{fid}", label="X", value=None, placeholder="Auto")
-                            with c_ay:
-                                f_annot_y = persistent_input(st.number_input, f"fit_ay_{plot_id}_{fid}", label="Y", value=None, placeholder="Auto")
-                            
-                            linear_fit_settings[fid] = {
-                                "color": f_color,
-                                "annot_x": f_annot_x,
-                                "annot_y": f_annot_y
-                            }
-                
-                if show_parabolic_fit:
-                    if show_linear_fit: st.markdown("---")
-                    st.markdown("**Parabolic Fit Range (X-Axis)**")
-                    c_pmin, c_pmax = st.columns(2)
-                    with c_pmin:
-                        pfit_range_min = persistent_input(st.number_input, f"pfmin_{plot_id}", label="Min X (Parabolic)", value=None, placeholder="Start")
-                    with c_pmax:
-                        pfit_range_max = persistent_input(st.number_input, f"pfmax_{plot_id}", label="Max X (Parabolic)", value=None, placeholder="End")
-                    st.caption("Leave empty to fit the entire range.")
-
-        if not selected_datasets:
-            st.info("Select at least one file to display the plot.")
-            return None
-
-        # --- Legend Customization ---
-        custom_legends = {}
-        with st.popover("🖊️ Legend Labels", width='stretch'):
-            for d in selected_datasets:
-                default_leg = d['label']
-                custom_leg = persistent_input(st.text_input, f"leg_{plot_id}_{d['id']}", label=f"Label for {d['fileName']}", value=default_leg)
-                custom_legends[d['id']] = custom_leg
-
-        # --- Customization ---
-        with st.expander("🎨 Plot Customization", expanded=False):
-            # Row 1: Titles & Theme
-            col_cust1, col_cust2, col_cust3 = st.columns(3)
-            with col_cust1:
-                custom_title = persistent_input(st.text_input, f"title_{plot_id}", label="Plot Title", value="", placeholder="Auto-generated if empty")
-                title_font_size = persistent_input(st.number_input, f"title_font_{plot_id}", label="Title Font Size", value=20, min_value=10, max_value=50)
-            with col_cust2:
-                template_mode = persistent_selectbox(
-                    "Theme", 
-                    ["Auto (Global)", "plotly_white", "plotly", "plotly_dark", "ggplot2", "seaborn", "simple_white", "none"], 
-                    index=0, 
-                    persistent_key=f"theme_{plot_id}"
-                )
-                show_legend = persistent_input(st.checkbox, f"legend_{plot_id}", label="Show Legend", value=True)
-            with col_cust3:
-                plot_mode = persistent_selectbox(
-                    "Plot Style", 
-                    ["Lines", "Markers", "Lines+Markers"], 
-                    index=0,
-                    persistent_key=f"style_{plot_id}"
-                )
-                if "Lines" in plot_mode:
-                    line_width = persistent_input(st.number_input, f"lw_{plot_id}", label="Line Width", value=2.0, min_value=0.5, max_value=10.0, step=0.5)
-                else:
-                    line_width = 2.0
-                
-                if "Markers" in plot_mode:
-                    marker_size = persistent_input(st.number_input, f"ms_{plot_id}", label="Marker Size", value=6, min_value=1, max_value=20, step=1)
-                else:
-                    marker_size = 6
+                        curve_settings[d['id']] = {"color": curve_color, "smoothing": curve_smooth}
 
             st.markdown("---")
-            
-            # Row 2: Axes
+            st.markdown("###### Plot Appearance")
+            col_cust1, col_cust2, col_cust3 = st.columns(3)
+            with col_cust1:
+                custom_title = persistent_input(st.text_input, f"title_{plot_id}", label="Plot Title", value="", placeholder="Auto")
+                title_font_size = persistent_input(st.number_input, f"title_font_{plot_id}", label="Title Size", value=20, min_value=10)
+            with col_cust2:
+                template_mode = persistent_selectbox("Theme", ["Auto (Global)", "plotly_white", "plotly", "plotly_dark", "ggplot2", "seaborn", "simple_white", "none"], index=0, persistent_key=f"theme_{plot_id}")
+                show_legend = persistent_input(st.checkbox, f"legend_{plot_id}", label="Show Legend", value=True)
+            with col_cust3:
+                plot_mode = persistent_selectbox("Style", ["Lines", "Markers", "Lines+Markers"], index=0, persistent_key=f"style_{plot_id}")
+                if "Lines" in plot_mode: line_width = persistent_input(st.number_input, f"lw_{plot_id}", label="Line Width", value=2.0, step=0.5)
+                if "Markers" in plot_mode: marker_size = persistent_input(st.number_input, f"ms_{plot_id}", label="Marker Size", value=6, step=1)
+
+            st.markdown("###### Axes")
             col_cust4, col_cust5, col_cust6 = st.columns(3)
             with col_cust4:
-                custom_xlabel = persistent_input(st.text_input, f"xlabel_{plot_id}", label="X-Axis Label", value="", placeholder="Auto-generated if empty")
-                axis_title_size = persistent_input(st.number_input, f"axis_title_font_{plot_id}", label="Axis Title Size", value=16, min_value=8, max_value=40)
-                
-                # X Limits
+                custom_xlabel = persistent_input(st.text_input, f"xlabel_{plot_id}", label="X Label", value="", placeholder="Auto")
+                axis_title_size = persistent_input(st.number_input, f"axis_title_font_{plot_id}", label="Label Size", value=16)
                 use_xlim = persistent_input(st.checkbox, f"use_xlim_{plot_id}", label="Set X Limits")
                 if use_xlim:
                     c_xmin, c_xmax = st.columns(2)
-                    with c_xmin:
-                        xlim_min = persistent_input(st.number_input, f"xlim_min_{plot_id}", label="Min", value=-9.0, format="%.2f")
-                    with c_xmax:
-                        xlim_max = persistent_input(st.number_input, f"xlim_max_{plot_id}", label="Max", value=9.0, format="%.2f")
-                else:
-                    xlim_min, xlim_max = None, None
+                    with c_xmin: xlim_min = persistent_input(st.number_input, f"xlim_min_{plot_id}", label="Min", value=-9.0, format="%.2f")
+                    with c_xmax: xlim_max = persistent_input(st.number_input, f"xlim_max_{plot_id}", label="Max", value=9.0, format="%.2f")
+                else: xlim_min, xlim_max = None, None
 
             with col_cust5:
-                custom_ylabel = persistent_input(st.text_input, f"ylabel_{plot_id}", label="Y-Axis Label", value="", placeholder="Auto-generated if empty")
-                tick_font_size = persistent_input(st.number_input, f"tick_font_{plot_id}", label="Tick Label Size", value=14, min_value=8, max_value=30)
-                
-                # Y Limits
+                custom_ylabel = persistent_input(st.text_input, f"ylabel_{plot_id}", label="Y Label", value="", placeholder="Auto")
+                tick_font_size = persistent_input(st.number_input, f"tick_font_{plot_id}", label="Tick Size", value=14)
                 use_ylim = persistent_input(st.checkbox, f"use_ylim_{plot_id}", label="Set Y Limits")
                 if use_ylim:
                     c_ymin, c_ymax = st.columns(2)
-                    with c_ymin:
-                        ylim_min = persistent_input(st.number_input, f"ylim_min_{plot_id}", label="Min", value=0.0, format="%.2e")
-                    with c_ymax:
-                        ylim_max = persistent_input(st.number_input, f"ylim_max_{plot_id}", label="Max", value=100.0, format="%.2e")
-                else:
-                    ylim_min, ylim_max = None, None
+                    with c_ymin: ylim_min = persistent_input(st.number_input, f"ylim_min_{plot_id}", label="Min", value=0.0, format="%.2e")
+                    with c_ymax: ylim_max = persistent_input(st.number_input, f"ylim_max_{plot_id}", label="Max", value=100.0, format="%.2e")
+                else: ylim_min, ylim_max = None, None
 
             with col_cust6:
                 show_grid = persistent_input(st.checkbox, f"grid_{plot_id}", label="Show Grid", value=True)
                 grid_color = persistent_input(st.color_picker, f"grid_color_{plot_id}", label="Grid Color", value="#E5E5E5")
 
+            st.markdown("###### Text Annotation")
+            annot_text = persistent_input(st.text_input, f"annot_txt_{plot_id}", label="Text", value="")
+            if annot_text:
+                st.caption("Note: Drag & Drop is not supported. Please adjust X/Y coordinates manually.")
+                c_ax, c_ay = st.columns(2)
+                with c_ax: annot_x = persistent_input(st.number_input, f"annot_x_{plot_id}", label="X Position", value=0.0, format="%.4f")
+                with c_ay: annot_y = persistent_input(st.number_input, f"annot_y_{plot_id}", label="Y Position", value=0.0, format="%.4f")
+                c_ac, c_as = st.columns(2)
+                with c_ac: annot_color = persistent_input(st.color_picker, f"annot_col_{plot_id}", label="Color", value="#000000")
+                with c_as: annot_size = persistent_input(st.number_input, f"annot_sz_{plot_id}", label="Size", value=14, min_value=8)
+
+        # --- TAB 4: EXPORT ---
+        with tab_export:
+            st.markdown("###### Export Data")
+            st.info("Statistics and Download options will appear here after the plot is generated.")
+
+        if not selected_datasets:
+            st.info("Select at least one file to display the plot.")
+            return None
+
+        # --- PLOT GENERATION ---
         fig = go.Figure()
-        
-        # Prepare data for export
         export_data = {}
 
         for d in selected_datasets:
             items_to_plot = [] # List of tuples: (x_data, y_data, x_label, y_label, suffix)
 
             if analysis_mode in ["Standard MR Analysis", "Standard R-H Analysis"]:
-                # Base Data
                 df_base = pd.DataFrame({"H_T": d["H_T"], "R": d["R"]})
-                
-                # List of dataframes to process: (df, suffix)
                 dfs_to_process = [(df_base, "")]
-                
-                # Check if this specific file is selected for symmetrization
                 if d['id'] in symmetrize_files:
-                    # Simple Mirror Logic: (H, R) -> (-H, R)
-                    # Plots the symmetric of the curve with respect to the Y-axis
                     df_sym = df_base.copy()
                     df_sym["H_T"] = -df_sym["H_T"]
-                    
                     dfs_to_process.append((df_sym, " (Sym)"))
 
                 for df, suffix in dfs_to_process:
-                    # Calculate R0
                     r0 = 1.0
-                    if r0_method == "First Point":
-                        r0 = df["R"].iloc[0]
-                    elif r0_method == "Closest to 0T":
-                        idx = df["H_T"].abs().idxmin()
-                        r0 = df["R"].iloc[idx]
+                    if r0_method == "First Point": r0 = df["R"].iloc[0]
+                    elif r0_method == "Closest to 0T": r0 = df["R"].iloc[df["H_T"].abs().idxmin()]
                     elif r0_method == "Mean within Window":
                         mask = df["H_T"].abs() <= r0_window
-                        if mask.any():
-                            r0 = df.loc[mask, "R"].mean()
-                        else:
-                            idx = df["H_T"].abs().idxmin()
-                            r0 = df["R"].iloc[idx]
-                    elif r0_method == "Max Resistance":
-                        r0 = df["R"].max()
+                        r0 = df.loc[mask, "R"].mean() if mask.any() else df["R"].iloc[df["H_T"].abs().idxmin()]
+                    elif r0_method == "Max Resistance": r0 = df["R"].max()
 
-                    # Calculate X
-                    x_d = df["H_T"]
-                    x_l = "Field (T)"
-                    if x_axis_unit == "Oersted (Oe)":
-                        x_d = x_d * 10000
-                        x_l = "Field (Oe)"
+                    x_d, x_l = df["H_T"], "Field (T)"
+                    if x_axis_unit == "Oersted (Oe)": x_d, x_l = x_d * 10000, "Field (Oe)"
 
-                    # Calculate Y
-                    y_d = None
-                    y_l = ""
-                    
-                    if y_axis_mode == "Magnetoresistance (MR %)":
-                        y_d = 100 * (df["R"] - r0) / r0
-                        y_l = "MR (%)"
-                    elif y_axis_mode == "Normalized (R/R0)":
-                        y_d = df["R"] / r0
-                        y_l = "R / R0"
+                    y_d, y_l = None, ""
+                    if y_axis_mode == "Magnetoresistance (MR %)": y_d, y_l = 100 * (df["R"] - r0) / r0, "MR (%)"
+                    elif y_axis_mode == "Normalized (R/R0)": y_d, y_l = df["R"] / r0, "R / R0"
                     elif y_axis_mode == "Derivative (dR/dH)":
-                        dy = df["R"].diff()
-                        dx = df["H_T"].diff()
-                        y_d = dy / dx
-                        y_l = "dR/dH (Ω/T)"
+                        y_d, y_l = df["R"].diff() / df["H_T"].diff(), "dR/dH (Ω/T)"
                         y_d = y_d.fillna(0)
-                    else: # Resistance
-                        y_d = df["R"]
-                        y_l = "Resistance (Ω)"
+                    else: y_d, y_l = df["R"], "Resistance (Ω)"
                     
                     items_to_plot.append((x_d, y_d, x_l, y_l, suffix))
             
             elif analysis_mode == "Standard R-T Analysis":
-                if 'full_df' not in d:
-                    st.warning(f"Full data not available for {d['label']}")
-                    continue
-                
+                if 'full_df' not in d: continue
                 full_df = d['full_df']
                 cols = full_df.columns.tolist()
                 temp_idx = choose_temperature_column(cols)
-                
-                if temp_idx < 0:
-                    st.warning(f"No Temperature column found in {d['label']}")
-                    continue
-                    
+                if temp_idx < 0: continue
                 temp_col = cols[temp_idx]
-                
-                # Use the resistance column identified during parsing
                 r_col = d['rCol']
-                if r_col not in full_df.columns:
-                    st.warning(f"Resistance column '{r_col}' not found in {d['label']}")
-                    continue
+                if r_col not in full_df.columns: continue
                 
-                # Create working DF
-                df = pd.DataFrame({"T": full_df[temp_col], "R": full_df[r_col]})
-                df = df.dropna().sort_values("T")
-                
-                x_data = df["T"]
-                x_label = "Temperature (K)"
-                
-                y_data = None
-                y_label = ""
+                df = pd.DataFrame({"T": full_df[temp_col], "R": full_df[r_col]}).dropna().sort_values("T")
+                x_data, x_label = df["T"], "Temperature (K)"
+                y_data, y_label = None, ""
 
-                if y_axis_mode == "Resistance (Ω)":
-                    y_data = df["R"]
-                    y_label = "Resistance (Ω)"
+                if y_axis_mode == "Resistance (Ω)": y_data, y_label = df["R"], "Resistance (Ω)"
                 elif y_axis_mode == "Normalized (R/R_300K)":
-                    # Find R at closest T to 300K
-                    idx_300 = (df["T"] - 300).abs().idxmin()
-                    r_300 = df.loc[idx_300, "R"]
-                    y_data = df["R"] / r_300
-                    y_label = "R / R(300K)"
+                    r_300 = df.loc[(df["T"] - 300).abs().idxmin(), "R"]
+                    y_data, y_label = df["R"] / r_300, "R / R(300K)"
                 elif y_axis_mode == "Derivative (dR/dT)":
-                    dy = df["R"].diff()
-                    dx = df["T"].diff()
-                    y_data = dy / dx
-                    y_label = "dR/dT (Ω/K)"
-                    y_data = y_data.fillna(0)
+                    y_data, y_label = (df["R"].diff() / df["T"].diff()).fillna(0), "dR/dT (Ω/K)"
                 
                 items_to_plot.append((x_data, y_data, x_label, y_label, ""))
 
-            else:
-                # Custom Columns Mode
-                if 'full_df' not in d:
-                    st.warning(f"Full data not available for {d['label']}")
-                    continue
-                
+            else: # Custom Columns
+                if 'full_df' not in d: continue
                 full_df = d['full_df']
-                
-                # Helper to get data (handling virtual columns)
                 def get_col_data(col_name, df):
                     if col_name == "Magnetic Field (T)":
-                        # Find Oe column
                         for c in df.columns:
-                            if "Oe" in c or "Oersted" in c:
-                                return df[c] * 1e-4, "Magnetic Field (T)"
+                            if "Oe" in c or "Oersted" in c: return df[c] * 1e-4, "Magnetic Field (T)"
                         return None, None
-                    elif col_name in df.columns:
-                        return df[col_name], col_name
+                    elif col_name in df.columns: return df[col_name], col_name
                     return None, None
 
                 x_data, x_label = get_col_data(custom_x_col, full_df)
                 y_data, y_label = get_col_data(custom_y_col, full_df)
 
-                if x_data is None:
-                    st.warning(f"Column '{custom_x_col}' not found in {d['label']}")
-                    continue
-                if y_data is None:
-                    st.warning(f"Column '{custom_y_col}' not found in {d['label']}")
-                    continue
-                
-                # Drop NaNs
-                mask = x_data.notna() & y_data.notna()
-                x_data = x_data[mask]
-                y_data = y_data[mask]
+                if x_data is not None and y_data is not None:
+                    mask = x_data.notna() & y_data.notna()
+                    x_data, y_data = x_data[mask], y_data[mask]
 
-                if plot_derivative:
-                    # Sort by X for derivative calculation
-                    temp_df = pd.DataFrame({'x': x_data, 'y': y_data}).sort_values('x')
-                    x_sorted = temp_df['x']
-                    y_sorted = temp_df['y']
+                    if plot_derivative:
+                        temp_df = pd.DataFrame({'x': x_data, 'y': y_data}).sort_values('x')
+                        deriv = temp_df['y'].diff() / temp_df['x'].diff()
+                        deriv = deriv.replace([np.inf, -np.inf], np.nan)
+                        x_data, y_data, y_label = temp_df['x'], deriv, f"d({y_label})/d({x_label})"
+                        mask_d = y_data.notna()
+                        x_data, y_data = x_data[mask_d], y_data[mask_d]
                     
-                    dy = y_sorted.diff()
-                    dx = x_sorted.diff()
-                    
-                    # Calculate derivative
-                    deriv = dy / dx
-                    
-                    # Handle division by zero or infinite values
-                    deriv = deriv.replace([np.inf, -np.inf], np.nan)
-                    
-                    x_data = x_sorted
-                    y_data = deriv
-                    y_label = f"d({y_label})/d({x_label})"
-                    
-                    # Drop NaNs created by diff
-                    mask_d = y_data.notna()
-                    x_data = x_data[mask_d]
-                    y_data = y_data[mask_d]
-                
-                items_to_plot.append((x_data, y_data, x_label, y_label, ""))
+                    items_to_plot.append((x_data, y_data, x_label, y_label, ""))
 
             # --- PLOTTING LOOP ---
             for x_data, y_data, x_label, y_label, suffix in items_to_plot:
-                if x_data is None or y_data is None:
-                    continue
+                if x_data is None or y_data is None: continue
 
-                # Get Curve Settings
                 c_settings = curve_settings.get(d['id'], {})
                 c_color = c_settings.get("color")
                 c_smooth = c_settings.get("smoothing", 0)
 
-                # Smoothing
-                if c_smooth > 1:
-                    y_data = y_data.rolling(window=int(c_smooth), center=True).mean()
+                if c_smooth > 1: y_data = y_data.rolling(window=int(c_smooth), center=True).mean()
 
-                # Plot Trace
                 mode_map = {"Lines": "lines", "Markers": "markers", "Lines+Markers": "lines+markers"}
-                
-                # Legend Name
                 base_legend = custom_legends.get(d['id'], d['fileName'])
                 legend_name = f"{base_legend}{suffix}"
                 
                 line_style = dict(width=line_width, dash='dash' if suffix else None)
-                if c_color:
-                    line_style['color'] = c_color
+                if c_color: line_style['color'] = c_color
                 
                 marker_style = dict(size=marker_size)
-                if c_color:
-                    marker_style['color'] = c_color
+                if c_color: marker_style['color'] = c_color
 
                 fig.add_trace(go.Scatter(
-                    x=x_data,
-                    y=y_data,
-                    mode=mode_map[plot_mode],
-                    name=legend_name,
+                    x=x_data, y=y_data, mode=mode_map[plot_mode], name=legend_name,
                     hovertemplate=f"{x_label}: %{{x:.4f}}<br>{y_label}: %{{y:.4e}}<extra></extra>",
                     line=line_style if "Lines" in plot_mode else None,
                     marker=marker_style if "Markers" in plot_mode else None
@@ -795,118 +544,39 @@ def create_plot_interface(plot_id: str, available_datasets: List[Dict[str, Any]]
                 # Linear Fit
                 if show_linear_fit and d['id'] in linear_fit_settings and x_data is not None and y_data is not None:
                     fit_cfg = linear_fit_settings[d['id']]
-                    
-                    # Remove NaNs for fitting
                     mask_fit = x_data.notna() & y_data.notna()
-                    
-                    # Apply Range Filter
-                    if fit_range_min is not None:
-                        mask_fit &= (x_data >= fit_range_min)
-                    if fit_range_max is not None:
-                        mask_fit &= (x_data <= fit_range_max)
-                    
-                    xf = x_data[mask_fit]
-                    yf = y_data[mask_fit]
+                    if fit_range_min is not None: mask_fit &= (x_data >= fit_range_min)
+                    if fit_range_max is not None: mask_fit &= (x_data <= fit_range_max)
+                    xf, yf = x_data[mask_fit], y_data[mask_fit]
                     
                     if len(xf) > 1:
-                        # Polyfit degree 1
                         slope, intercept = np.polyfit(xf, yf, 1)
                         y_fit = slope * xf + intercept
+                        fig.add_trace(go.Scatter(x=xf, y=y_fit, mode='lines', name=f"Fit {legend_name}", line=dict(dash='dash', width=2, color=fit_cfg.get('color', 'red')), hoverinfo='skip'))
                         
-                        # Plot the fit line only within the range
-                        fig.add_trace(go.Scatter(
-                            x=xf,
-                            y=y_fit,
-                            mode='lines',
-                            name=f"Fit {legend_name}",
-                            line=dict(dash='dash', width=2, color=fit_cfg.get('color', 'red')),
-                            hoverinfo='skip'
-                        ))
-                        
-                        # Enhanced Annotation
-                        eq_text = f"<b>y = {slope:.3e} x + {intercept:.3e}</b>"
-                        
-                        # Position annotation
-                        annot_x = fit_cfg.get('annot_x')
-                        annot_y = fit_cfg.get('annot_y')
-                        
-                        # Default to center if not provided
-                        if annot_x is None or annot_y is None:
+                        annot_x_f = fit_cfg.get('annot_x')
+                        annot_y_f = fit_cfg.get('annot_y')
+                        if annot_x_f is None or annot_y_f is None:
                             mid_idx = len(xf) // 2
-                            annot_x = xf.iloc[mid_idx]
-                            annot_y = y_fit.iloc[mid_idx]
-                            ay_offset = -40
-                        else:
-                            ay_offset = 0 # No offset if manually positioned
+                            annot_x_f, annot_y_f, ay_offset = xf.iloc[mid_idx], y_fit.iloc[mid_idx], -40
+                        else: ay_offset = 0
                         
-                        fig.add_annotation(
-                            x=annot_x,
-                            y=annot_y,
-                            text=eq_text,
-                            showarrow=True,
-                            arrowhead=2,
-                            arrowsize=1,
-                            arrowwidth=2,
-                            ax=0,
-                            ay=ay_offset,
-                            bgcolor="rgba(255, 255, 255, 0.8)",
-                            bordercolor="black",
-                            borderwidth=1,
-                            font=dict(size=14, color="black")
-                        )
+                        fig.add_annotation(x=annot_x_f, y=annot_y_f, text=f"<b>y = {slope:.3e} x + {intercept:.3e}</b>", showarrow=True, arrowhead=2, arrowsize=1, arrowwidth=2, ax=0, ay=ay_offset, bgcolor="rgba(255, 255, 255, 0.8)", bordercolor="black", borderwidth=1, font=dict(size=14, color="black"))
 
                 # Parabolic Fit
                 if show_parabolic_fit and x_data is not None and y_data is not None:
-                    # Remove NaNs for fitting
                     mask_pfit = x_data.notna() & y_data.notna()
+                    if pfit_range_min is not None: mask_pfit &= (x_data >= pfit_range_min)
+                    if pfit_range_max is not None: mask_pfit &= (x_data <= pfit_range_max)
+                    xpf, ypf = x_data[mask_pfit], y_data[mask_pfit]
                     
-                    # Apply Range Filter
-                    if pfit_range_min is not None:
-                        mask_pfit &= (x_data >= pfit_range_min)
-                    if pfit_range_max is not None:
-                        mask_pfit &= (x_data <= pfit_range_max)
-                    
-                    xpf = x_data[mask_pfit]
-                    ypf = y_data[mask_pfit]
-                    
-                    if len(xpf) > 2: # Need at least 3 points for parabola
-                        # Polyfit degree 2
+                    if len(xpf) > 2:
                         a, b, c = np.polyfit(xpf, ypf, 2)
                         y_pfit = a * xpf**2 + b * xpf + c
-                        
-                        # Plot the fit line only within the range
-                        fig.add_trace(go.Scatter(
-                            x=xpf,
-                            y=y_pfit,
-                            mode='lines',
-                            name=f"ParaFit {legend_name}",
-                            line=dict(dash='dot', width=3, color='green'),
-                            hoverinfo='skip'
-                        ))
-                        
-                        # Enhanced Annotation
-                        eq_text = f"<b>y = {a:.2e} x² + {b:.2e} x + {c:.2e}</b>"
-                        
-                        # Position annotation near the center of the fit segment
+                        fig.add_trace(go.Scatter(x=xpf, y=y_pfit, mode='lines', name=f"ParaFit {legend_name}", line=dict(dash='dot', width=3, color='green'), hoverinfo='skip'))
                         mid_idx = len(xpf) // 2
-                        
-                        fig.add_annotation(
-                            x=xpf.iloc[mid_idx],
-                            y=y_pfit.iloc[mid_idx],
-                            text=eq_text,
-                            showarrow=True,
-                            arrowhead=2,
-                            arrowsize=1,
-                            arrowwidth=2,
-                            ax=0,
-                            ay=40, # Offset downwards
-                            bgcolor="rgba(255, 255, 255, 0.8)",
-                            bordercolor="blue",
-                            borderwidth=1,
-                            font=dict(size=14, color="blue")
-                        )
+                        fig.add_annotation(x=xpf.iloc[mid_idx], y=y_pfit.iloc[mid_idx], text=f"<b>y = {a:.2e} x² + {b:.2e} x + {c:.2e}</b>", showarrow=True, arrowhead=2, arrowsize=1, arrowwidth=2, ax=0, ay=40, bgcolor="rgba(255, 255, 255, 0.8)", bordercolor="blue", borderwidth=1, font=dict(size=14, color="blue"))
 
-                # Add to export
                 clean_label = d['label'].replace(" ", "_") + suffix.replace(" ", "_").replace("(", "").replace(")", "")
                 export_data[f"{clean_label}_X"] = x_data.values
                 export_data[f"{clean_label}_Y"] = y_data.values
@@ -916,117 +586,52 @@ def create_plot_interface(plot_id: str, available_datasets: List[Dict[str, Any]]
         final_xlabel = custom_xlabel if custom_xlabel else x_label
         final_ylabel = custom_ylabel if custom_ylabel else y_label
 
-        # Add Manual Annotation
         if annot_text:
-             fig.add_annotation(
-                x=annot_x,
-                y=annot_y,
-                text=annot_text,
-                showarrow=False,
-                font=dict(size=annot_size, color=annot_color),
-                bgcolor="rgba(255, 255, 255, 0.5)"
-            )
+             fig.add_annotation(x=annot_x, y=annot_y, text=annot_text, showarrow=False, font=dict(size=annot_size, color=annot_color), bgcolor="rgba(255, 255, 255, 0.5)")
 
-        # Determine Theme
-        final_template = template_mode
-        if template_mode == "Auto (Global)":
-            final_template = "plotly" 
-        
-        # Construct uirevision to preserve zoom/pan across reruns
+        final_template = template_mode if template_mode != "Auto (Global)" else "plotly"
         uirevision_key = f"{plot_id}_{analysis_mode}"
-        if analysis_mode == "Standard MR Analysis":
-             uirevision_key += f"_{x_axis_unit}_{y_axis_mode}"
-        elif analysis_mode == "Standard R-T Analysis":
-             uirevision_key += f"_{y_axis_mode}"
-        else:
-             uirevision_key += f"_{custom_x_col}_{custom_y_col}"
+        if analysis_mode == "Standard MR Analysis": uirevision_key += f"_{x_axis_unit}_{y_axis_mode}"
+        elif analysis_mode == "Standard R-T Analysis": uirevision_key += f"_{y_axis_mode}"
+        else: uirevision_key += f"_{custom_x_col}_{custom_y_col}"
 
-        layout_args = dict(
-            title=dict(
-                text=final_title,
-                font=dict(size=title_font_size),
-                x=0.5, # Center title
-                xanchor='center'
-            ),
-            xaxis=dict(
-                title=dict(text=final_xlabel, font=dict(size=axis_title_size)),
-                tickfont=dict(size=tick_font_size),
-                showgrid=show_grid,
-                gridcolor=grid_color,
-                range=[xlim_min, xlim_max] if use_xlim else None
-            ),
-            yaxis=dict(
-                title=dict(text=final_ylabel, font=dict(size=axis_title_size)),
-                tickfont=dict(size=tick_font_size),
-                showgrid=show_grid,
-                gridcolor=grid_color,
-                range=[ylim_min, ylim_max] if use_ylim else None
-            ),
-            showlegend=show_legend,
-            hovermode="closest",
-            height=height,
-            width=width,
-            template=final_template,
-            uirevision=uirevision_key
+        fig.update_layout(
+            title=dict(text=final_title, font=dict(size=title_font_size), x=0.5, xanchor='center'),
+            xaxis=dict(title=dict(text=final_xlabel, font=dict(size=axis_title_size)), tickfont=dict(size=tick_font_size), showgrid=show_grid, gridcolor=grid_color, range=[xlim_min, xlim_max] if use_xlim else None),
+            yaxis=dict(title=dict(text=final_ylabel, font=dict(size=axis_title_size)), tickfont=dict(size=tick_font_size), showgrid=show_grid, gridcolor=grid_color, range=[ylim_min, ylim_max] if use_ylim else None),
+            showlegend=show_legend, hovermode="closest", height=height, width=width, template=final_template, uirevision=uirevision_key
         )
 
-        fig.update_layout(**layout_args)
-
-        # Smart Filename for Download
-        safe_title = "".join([c for c in final_title if c.isalnum() or c in (' ', '-', '_')]).strip().replace(" ", "_")
-        if not safe_title:
-            safe_title = f"plot_{plot_id}"
-            
-        config = {
-            'toImageButtonOptions': {
-                'format': 'png',
-                'filename': f"MR_Analysis_{safe_title}",
-                'height': height,
-                'width': width,
-                'scale': 2
-            }
-        }
-
+        safe_title = "".join([c for c in final_title if c.isalnum() or c in (' ', '-', '_')]).strip().replace(" ", "_") or f"plot_{plot_id}"
+        config = {'toImageButtonOptions': {'format': 'png', 'filename': f"MR_Analysis_{safe_title}", 'height': height, 'width': width, 'scale': 2}}
         st.plotly_chart(fig, width="stretch", config=config, key=f"chart_{plot_id}")
         
-        # --- Statistics Table ---
+        # --- Statistics Table (In Export Tab) ---
         if export_data:
-            with st.expander("📊 Statistics Table", expanded=False):
-                stats_data = []
-                for key, val in export_data.items():
-                    if key.endswith("_Y"):
-                        label = key[:-2] # Remove _Y
-                        y_vals = val
-                        x_vals = export_data.get(f"{label}_X", [])
-                        
-                        if len(y_vals) > 0:
-                            stats_data.append({
-                                "Curve": label,
-                                "Min X": f"{np.min(x_vals):.4g}" if len(x_vals) > 0 else "-",
-                                "Max X": f"{np.max(x_vals):.4g}" if len(x_vals) > 0 else "-",
-                                "Min Y": f"{np.min(y_vals):.4g}",
-                                "Max Y": f"{np.max(y_vals):.4g}",
-                                "Mean Y": f"{np.mean(y_vals):.4g}",
-                                "Std Dev": f"{np.std(y_vals):.4g}"
-                            })
-                
-                if stats_data:
-                    st.dataframe(pd.DataFrame(stats_data), use_container_width=True, hide_index=True)
+            with tab_export:
+                with st.expander("📊 Statistics Table", expanded=True):
+                    stats_data = []
+                    for key, val in export_data.items():
+                        if key.endswith("_Y"):
+                            label = key[:-2]
+                            y_vals = val
+                            x_vals = export_data.get(f"{label}_X", [])
+                            if len(y_vals) > 0:
+                                stats_data.append({
+                                    "Curve": label,
+                                    "Min X": f"{np.min(x_vals):.4g}" if len(x_vals) > 0 else "-",
+                                    "Max X": f"{np.max(x_vals):.4g}" if len(x_vals) > 0 else "-",
+                                    "Min Y": f"{np.min(y_vals):.4g}",
+                                    "Max Y": f"{np.max(y_vals):.4g}",
+                                    "Mean Y": f"{np.mean(y_vals):.4g}",
+                                    "Std Dev": f"{np.std(y_vals):.4g}"
+                                })
+                    if stats_data: st.dataframe(pd.DataFrame(stats_data), use_container_width=True, hide_index=True)
 
-        # Export Options
-        st.write("") # Spacer
-        c_left, c_center, c_right = st.columns([1, 2, 1])
-        with c_center:
-            # Export of plotted data (Origin compatible .dat)
-            if export_data:
-                df_export = pd.DataFrame(dict([ (k,pd.Series(v)) for k,v in export_data.items() ]))
-                # Use tab separator for Origin compatibility
-                dat_exp = df_export.to_csv(index=False, sep='\t').encode('utf-8')
-                st.download_button(
-                    label=f"Download Plot {plot_id} Data (.dat)",
-                    data=dat_exp,
-                    file_name=f"plot_{plot_id}_data.dat",
-                    mime="text/plain",
-                    width='stretch'
-                )
+                st.write("")
+                c_left, c_center, c_right = st.columns([1, 2, 1])
+                with c_center:
+                    df_export = pd.DataFrame(dict([ (k,pd.Series(v)) for k,v in export_data.items() ]))
+                    dat_exp = df_export.to_csv(index=False, sep='\t').encode('utf-8')
+                    st.download_button(label=f"Download Plot {plot_id} Data (.dat)", data=dat_exp, file_name=f"plot_{plot_id}_data.dat", mime="text/plain", width='stretch')
         return fig
