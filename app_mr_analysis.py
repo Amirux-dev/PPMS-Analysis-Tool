@@ -64,48 +64,10 @@ uploaded_files = st.sidebar.file_uploader(
 
 # Process Uploaded Files
 if uploaded_files:
-    is_batch = len(uploaded_files) > 1
-    
-    if is_batch:
-        filenames = [f.name for f in uploaded_files]
-        prefix = os.path.commonprefix(filenames)
-        
-        target_batch_name = None
-        if prefix:
-            target_batch_name = f"📂 {prefix.strip('_- ')}"
-            
-        batch_id = None
-        if target_batch_name:
-            for d in st.session_state.all_datasets:
-                if d.get('batch_name') == target_batch_name:
-                    batch_id = d.get('batch_id')
-                    break
-            
-            if batch_id is None and 'custom_batches' in st.session_state:
-                for bid, bname in st.session_state.custom_batches.items():
-                    if bname == target_batch_name:
-                        batch_id = bid
-                        break
-        
-        if batch_id is not None:
-            batch_name = target_batch_name
-        else:
-            existing_batch_ids = set(d.get('batch_id', 0) for d in st.session_state.all_datasets)
-            if 'custom_batches' in st.session_state:
-                existing_batch_ids.update(st.session_state.custom_batches.keys())
-            existing_batch_ids.discard(0)
-            
-            batch_id = 1
-            while batch_id in existing_batch_ids:
-                batch_id += 1
-            
-            if target_batch_name:
-                batch_name = target_batch_name
-            else:
-                batch_name = f"📂 Batch Import #{batch_id}"
-    else:
-        batch_id = 0
-        batch_name = "📄 File by file import"
+    # Always create a new batch for every import action
+    st.session_state.batch_counter += 1
+    batch_id = st.session_state.batch_counter
+    batch_name = f"📂 Batch Import #{batch_id}"
     
     new_files_count = 0
     updated_files_count = 0
@@ -147,7 +109,7 @@ if uploaded_files:
             save_session_state()
             
         msg = []
-        if new_files_count > 0: msg.append(f"{new_files_count} added")
+        if new_files_count > 0: msg.append(f"{new_files_count} added to '{batch_name}'")
         if updated_files_count > 0: msg.append(f"{updated_files_count} updated")
         if skipped_count > 0: msg.append(f"{skipped_count} skipped")
         

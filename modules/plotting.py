@@ -127,7 +127,7 @@ def duplicate_plot_callback(plot_id):
     # Copy state
     for key in list(st.session_state.keys()):
         # Exclude buttons and temporary states
-        if any(x in key for x in ["dup_", "add_btn_", "del_btn_", "ren_btn_", "paste_"]): continue
+        if any(x in key for x in ["dup_", "add_btn_", "del_btn_", "ren_btn_", "paste_", "add_annot_btn_", "del_annot_", "dl_", "chart_", "ren_mode_"]): continue
         
         new_key = None
         # Case 1: Key ends with _{plot_id} (Standard widgets)
@@ -222,7 +222,18 @@ def create_plot_interface(plot_id: str, available_datasets: List[Dict[str, Any]]
         if widget_batch_key in st.session_state:
             st.session_state[persistent_batch_key] = st.session_state[widget_batch_key]
             
-        selected_batch_id = st.selectbox("Filter by Folder", options, format_func=format_batch, index=options.index(st.session_state[persistent_batch_key]), key=widget_batch_key, on_change=save_session_state)
+        # Fix for Streamlit warning: Only pass index if key is not in session_state
+        sb_kwargs = {
+            "label": "Filter by Folder",
+            "options": options,
+            "format_func": format_batch,
+            "key": widget_batch_key,
+            "on_change": save_session_state
+        }
+        if widget_batch_key not in st.session_state:
+            sb_kwargs["index"] = options.index(st.session_state[persistent_batch_key])
+            
+        selected_batch_id = st.selectbox(**sb_kwargs)
         
         filtered_datasets = [d for d in available_datasets if d.get('batch_id') == selected_batch_id] if selected_batch_id != "ALL" else available_datasets
         filtered_filenames = [d['fileName'] for d in filtered_datasets]
@@ -242,7 +253,17 @@ def create_plot_interface(plot_id: str, available_datasets: List[Dict[str, Any]]
         if widget_sel_key in st.session_state:
             st.session_state[persistent_sel_key] = st.session_state[widget_sel_key]
         
-        selected_filenames = st.multiselect(f"Select Curves for {plot_name}", options=combined_options, default=current_selection, key=widget_sel_key, on_change=save_session_state)
+        # Fix for Streamlit warning: Only pass default if key is not in session_state
+        ms_kwargs = {
+            "label": f"Select Curves for {plot_name}",
+            "options": combined_options,
+            "key": widget_sel_key,
+            "on_change": save_session_state
+        }
+        if widget_sel_key not in st.session_state:
+            ms_kwargs["default"] = current_selection
+            
+        selected_filenames = st.multiselect(**ms_kwargs)
         selected_datasets = [d for d in available_datasets if d['fileName'] in selected_filenames]
 
         # --- TABS LAYOUT ---
@@ -435,7 +456,20 @@ def create_plot_interface(plot_id: str, available_datasets: List[Dict[str, Any]]
                         if 'persistent_values' not in st.session_state: st.session_state['persistent_values'] = {}
                         saved_sym = st.session_state['persistent_values'].get(sym_key, [])
                         valid_sym = [sid for sid in saved_sym if sid in sym_options]
-                        selected_sym_ids = st.multiselect("Files", options=list(sym_options.keys()), format_func=lambda x: sym_options[x], default=valid_sym, key=f"widget_sym_{plot_id}_{st.session_state.uploader_key}", label_visibility="collapsed")
+                        
+                        sym_widget_key = f"widget_sym_{plot_id}_{st.session_state.uploader_key}"
+                        sym_kwargs = {
+                            "label": "Files",
+                            "options": list(sym_options.keys()),
+                            "format_func": lambda x: sym_options[x],
+                            "key": sym_widget_key,
+                            "label_visibility": "collapsed"
+                        }
+                        if sym_widget_key not in st.session_state:
+                            sym_kwargs["default"] = valid_sym
+                            
+                        selected_sym_ids = st.multiselect(**sym_kwargs)
+                        
                         if st.session_state['persistent_values'].get(sym_key) != selected_sym_ids:
                             st.session_state['persistent_values'][sym_key] = selected_sym_ids
                             save_session_state()
@@ -454,7 +488,18 @@ def create_plot_interface(plot_id: str, available_datasets: List[Dict[str, Any]]
                         fit_sel_key = f"fit_sel_{plot_id}"
                         saved_fit_sel = st.session_state['persistent_values'].get(fit_sel_key, [])
                         valid_fit_sel = [sid for sid in saved_fit_sel if sid in fit_options]
-                        selected_fit_ids = st.multiselect("Select Curves to Fit", options=list(fit_options.keys()), format_func=lambda x: fit_options[x], default=valid_fit_sel, key=f"widget_fit_sel_{plot_id}_{st.session_state.uploader_key}")
+                        
+                        fit_widget_key = f"widget_fit_sel_{plot_id}_{st.session_state.uploader_key}"
+                        fit_kwargs = {
+                            "label": "Select Curves to Fit",
+                            "options": list(fit_options.keys()),
+                            "format_func": lambda x: fit_options[x],
+                            "key": fit_widget_key
+                        }
+                        if fit_widget_key not in st.session_state:
+                            fit_kwargs["default"] = valid_fit_sel
+                            
+                        selected_fit_ids = st.multiselect(**fit_kwargs)
                         
                         if st.session_state['persistent_values'].get(fit_sel_key) != selected_fit_ids:
                             st.session_state['persistent_values'][fit_sel_key] = selected_fit_ids
@@ -494,7 +539,18 @@ def create_plot_interface(plot_id: str, available_datasets: List[Dict[str, Any]]
                         pfit_sel_key = f"pfit_sel_{plot_id}"
                         saved_pfit_sel = st.session_state['persistent_values'].get(pfit_sel_key, [])
                         valid_pfit_sel = [sid for sid in saved_pfit_sel if sid in fit_options]
-                        selected_pfit_ids = st.multiselect("Select Curves to Fit", options=list(fit_options.keys()), format_func=lambda x: fit_options[x], default=valid_pfit_sel, key=f"widget_pfit_sel_{plot_id}_{st.session_state.uploader_key}")
+                        
+                        pfit_widget_key = f"widget_pfit_sel_{plot_id}_{st.session_state.uploader_key}"
+                        pfit_kwargs = {
+                            "label": "Select Curves to Fit",
+                            "options": list(fit_options.keys()),
+                            "format_func": lambda x: fit_options[x],
+                            "key": pfit_widget_key
+                        }
+                        if pfit_widget_key not in st.session_state:
+                            pfit_kwargs["default"] = valid_pfit_sel
+                            
+                        selected_pfit_ids = st.multiselect(**pfit_kwargs)
                         
                         if st.session_state['persistent_values'].get(pfit_sel_key) != selected_pfit_ids:
                             st.session_state['persistent_values'][pfit_sel_key] = selected_pfit_ids

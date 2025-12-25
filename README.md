@@ -28,7 +28,7 @@ The application is available online at: **[https://ppms-analysis-tool.streamlit.
     *   Linear and Parabolic fitting tools.
 
 #### 🗂️ File Management
-*   **Batch Organization**: Create virtual "Batches" to organize measurements by sample, date, or experiment.
+*   **Batch Organization**: Imports are automatically organized into sequential "Batch Import #N" folders.
 *   **Smart Duplicate Handling**: Choose to **Skip** or **Overwrite** duplicate files during upload. Overwriting preserves active plots.
 *   **Batch Actions**: Move or delete multiple files simultaneously with **Folder Filtering**.
 *   **Smart Metadata**: Automatic extraction of Temperature, Field, and Sample Name from filenames.
@@ -92,7 +92,7 @@ L'application est disponible en ligne à l'adresse : **[https://ppms-analysis-to
     *   Ajustement linéaire et parabolique.
 
 #### 🗂️ Gestion de Fichiers
-*   **Organisation par Dossiers** : Créez des "Batches" virtuels pour organiser vos mesures par échantillon ou par date.
+*   **Organisation par Dossiers** : Les imports sont automatiquement organisés dans des dossiers séquentiels "Batch Import #N".
 *   **Gestion des Doublons** : Choisissez d'**Ignorer** ou d'**Écraser** les fichiers existants lors de l'upload. L'écrasement met à jour les graphiques en temps réel.
 *   **Actions par Lot** : Déplacez ou supprimez plusieurs fichiers simultanément avec **Filtrage par Dossier**.
 *   **Détection de Métadonnées** : Extraction automatique de la Température, du Champ et du nom de l'échantillon depuis le nom du fichier.
