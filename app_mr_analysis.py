@@ -638,6 +638,13 @@ with st.expander("Layout & Export Settings", expanded=True):
 generated_figures = []
 plot_indices = st.session_state.plot_ids
 
+if not plot_indices:
+    st.info("No plots available. Click below to add one.")
+    if st.button("➕ Add Plot", key="add_plot_empty", type="primary"):
+        from modules.plotting import add_plot_callback
+        add_plot_callback()
+        st.rerun()
+
 # Create rows
 rows = [plot_indices[i:i + num_cols] for i in range(0, len(plot_indices), num_cols)]
 

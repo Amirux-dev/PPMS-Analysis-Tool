@@ -331,10 +331,34 @@ def create_plot_interface(plot_id: str, available_datasets: List[Dict[str, Any]]
                 custom_x_col = persistent_selectbox("X Column", display_cols, index=default_x_idx, persistent_key=f"x_col_{plot_id}")
             
         st.markdown("###### Processing & Fits")
-        c_smooth, c_fit1, c_fit2, c_proc = st.columns(4, vertical_alignment="bottom")
         
-        with c_smooth:
-            smooth_window = persistent_input(st.number_input, f"smooth_{plot_id}", label="Smoothing (pts)", min_value=0, value=0, step=1, help="Moving average window size.")
+        # --- Curve Styling & Processing Popover ---
+        with st.popover("🎨 Curve Styling & Processing", use_container_width=True):
+            st.markdown("**Curve Settings**")
+            
+            curve_settings = {} # Store settings per file_id
+            
+            if not selected_datasets:
+                st.info("Select curves first.")
+            else:
+                for d in selected_datasets:
+                    with st.expander(f"Settings: {d['fileName']}", expanded=False):
+                        c_col, c_smooth = st.columns(2)
+                        with c_col:
+                            # Color Picker
+                            default_color = "#000000" # Default black, Plotly will override if None/Empty but we want explicit control if user asks
+                            # We use persistent_input with color_picker
+                            curve_color = persistent_input(st.color_picker, f"color_{plot_id}_{d['id']}", label="Color", value=None)
+                        with c_smooth:
+                            # Smoothing per curve
+                            curve_smooth = persistent_input(st.number_input, f"smooth_{plot_id}_{d['id']}", label="Smoothing (pts)", min_value=0, value=0, step=1)
+                        
+                        curve_settings[d['id']] = {
+                            "color": curve_color,
+                            "smoothing": curve_smooth
+                        }
+
+        c_fit1, c_fit2, c_proc, c_annot = st.columns(4, vertical_alignment="bottom")
         
         with c_fit1:
             show_linear_fit = persistent_input(st.toggle, f"fit_{plot_id}", label="Linear Fit", value=False, help="Fit Y = aX + b")
@@ -377,21 +401,84 @@ def create_plot_interface(plot_id: str, available_datasets: List[Dict[str, Any]]
             else:
                 plot_derivative = persistent_input(st.toggle, f"deriv_{plot_id}", label="Derivative", value=False, help="Plot dY/dX vs X")
 
+        with c_annot:
+             with st.popover("📝 Text", use_container_width=True):
+                st.markdown("**Add Text Annotation**")
+                annot_text = persistent_input(st.text_input, f"annot_txt_{plot_id}", label="Text", value="")
+                if annot_text:
+                    c_ax, c_ay = st.columns(2)
+                    with c_ax:
+                        annot_x = persistent_input(st.number_input, f"annot_x_{plot_id}", label="X Position", value=0.0, format="%.4f")
+                    with c_ay:
+                        annot_y = persistent_input(st.number_input, f"annot_y_{plot_id}", label="Y Position", value=0.0, format="%.4f")
+                    
+                    c_ac, c_as = st.columns(2)
+                    with c_ac:
+                        annot_color = persistent_input(st.color_picker, f"annot_col_{plot_id}", label="Color", value="#000000")
+                    with c_as:
+                        annot_size = persistent_input(st.number_input, f"annot_sz_{plot_id}", label="Size", value=14, min_value=8, max_value=50)
+
         fit_range_min = None
         fit_range_max = None
         pfit_range_min = None
         pfit_range_max = None
         
+        # Linear Fit Settings
+        linear_fit_settings = {}
+        
         if show_linear_fit or show_parabolic_fit:
             with st.popover("📏 Fit Settings", width='stretch'):
                 if show_linear_fit:
-                    st.markdown("**Linear Fit Range (X-Axis)**")
+                    st.markdown("**Linear Fit Settings**")
+                    
+                    # Select curves to fit
+                    fit_options = {d['id']: d['fileName'] for d in selected_datasets}
+                    
+                    fit_sel_key = f"fit_sel_{plot_id}"
+                    saved_fit_sel = st.session_state['persistent_values'].get(fit_sel_key, [])
+                    valid_fit_sel = [sid for sid in saved_fit_sel if sid in fit_options]
+                    
+                    selected_fit_ids = st.multiselect(
+                        "Select Curves to Fit",
+                        options=list(fit_options.keys()),
+                        format_func=lambda x: fit_options[x],
+                        default=valid_fit_sel,
+                        key=f"widget_fit_sel_{plot_id}_{st.session_state.uploader_key}"
+                    )
+                    
+                    if st.session_state['persistent_values'].get(fit_sel_key) != selected_fit_ids:
+                        st.session_state['persistent_values'][fit_sel_key] = selected_fit_ids
+                        save_session_state()
+                    
+                    st.markdown("---")
+                    st.markdown("**Fit Range (X-Axis)**")
                     c_fmin, c_fmax = st.columns(2)
                     with c_fmin:
-                        fit_range_min = persistent_input(st.number_input, f"fmin_{plot_id}", label="Min X (Linear)", value=None, placeholder="Start")
+                        fit_range_min = persistent_input(st.number_input, f"fmin_{plot_id}", label="Min X", value=None, placeholder="Start")
                     with c_fmax:
-                        fit_range_max = persistent_input(st.number_input, f"fmax_{plot_id}", label="Max X (Linear)", value=None, placeholder="End")
+                        fit_range_max = persistent_input(st.number_input, f"fmax_{plot_id}", label="Max X", value=None, placeholder="End")
                     st.caption("Leave empty to fit the entire range.")
+                    
+                    st.markdown("---")
+                    st.markdown("**Appearance**")
+                    for fid in selected_fit_ids:
+                        with st.expander(f"Fit: {fit_options[fid]}", expanded=False):
+                            c_fc, c_fs = st.columns(2)
+                            with c_fc:
+                                f_color = persistent_input(st.color_picker, f"fit_col_{plot_id}_{fid}", label="Line Color", value="#FF0000")
+                            
+                            st.markdown("Annotation Position")
+                            c_ax, c_ay = st.columns(2)
+                            with c_ax:
+                                f_annot_x = persistent_input(st.number_input, f"fit_ax_{plot_id}_{fid}", label="X", value=None, placeholder="Auto")
+                            with c_ay:
+                                f_annot_y = persistent_input(st.number_input, f"fit_ay_{plot_id}_{fid}", label="Y", value=None, placeholder="Auto")
+                            
+                            linear_fit_settings[fid] = {
+                                "color": f_color,
+                                "annot_x": f_annot_x,
+                                "annot_y": f_annot_y
+                            }
                 
                 if show_parabolic_fit:
                     if show_linear_fit: st.markdown("---")
@@ -671,9 +758,14 @@ def create_plot_interface(plot_id: str, available_datasets: List[Dict[str, Any]]
                 if x_data is None or y_data is None:
                     continue
 
+                # Get Curve Settings
+                c_settings = curve_settings.get(d['id'], {})
+                c_color = c_settings.get("color")
+                c_smooth = c_settings.get("smoothing", 0)
+
                 # Smoothing
-                if smooth_window > 1:
-                    y_data = y_data.rolling(window=int(smooth_window), center=True).mean()
+                if c_smooth > 1:
+                    y_data = y_data.rolling(window=int(c_smooth), center=True).mean()
 
                 # Plot Trace
                 mode_map = {"Lines": "lines", "Markers": "markers", "Lines+Markers": "lines+markers"}
@@ -682,18 +774,28 @@ def create_plot_interface(plot_id: str, available_datasets: List[Dict[str, Any]]
                 base_legend = custom_legends.get(d['id'], d['fileName'])
                 legend_name = f"{base_legend}{suffix}"
                 
+                line_style = dict(width=line_width, dash='dash' if suffix else None)
+                if c_color:
+                    line_style['color'] = c_color
+                
+                marker_style = dict(size=marker_size)
+                if c_color:
+                    marker_style['color'] = c_color
+
                 fig.add_trace(go.Scatter(
                     x=x_data,
                     y=y_data,
                     mode=mode_map[plot_mode],
                     name=legend_name,
                     hovertemplate=f"{x_label}: %{{x:.4f}}<br>{y_label}: %{{y:.4e}}<extra></extra>",
-                    line=dict(width=line_width, dash='dash' if suffix else None) if "Lines" in plot_mode else None,
-                    marker=dict(size=marker_size) if "Markers" in plot_mode else None
+                    line=line_style if "Lines" in plot_mode else None,
+                    marker=marker_style if "Markers" in plot_mode else None
                 ))
                 
                 # Linear Fit
-                if show_linear_fit and x_data is not None and y_data is not None:
+                if show_linear_fit and d['id'] in linear_fit_settings and x_data is not None and y_data is not None:
+                    fit_cfg = linear_fit_settings[d['id']]
+                    
                     # Remove NaNs for fitting
                     mask_fit = x_data.notna() & y_data.notna()
                     
@@ -717,26 +819,36 @@ def create_plot_interface(plot_id: str, available_datasets: List[Dict[str, Any]]
                             y=y_fit,
                             mode='lines',
                             name=f"Fit {legend_name}",
-                            line=dict(dash='dash', width=2, color='red'),
+                            line=dict(dash='dash', width=2, color=fit_cfg.get('color', 'red')),
                             hoverinfo='skip'
                         ))
                         
                         # Enhanced Annotation
                         eq_text = f"<b>y = {slope:.3e} x + {intercept:.3e}</b>"
                         
-                        # Position annotation near the center of the fit segment
-                        mid_idx = len(xf) // 2
+                        # Position annotation
+                        annot_x = fit_cfg.get('annot_x')
+                        annot_y = fit_cfg.get('annot_y')
+                        
+                        # Default to center if not provided
+                        if annot_x is None or annot_y is None:
+                            mid_idx = len(xf) // 2
+                            annot_x = xf.iloc[mid_idx]
+                            annot_y = y_fit.iloc[mid_idx]
+                            ay_offset = -40
+                        else:
+                            ay_offset = 0 # No offset if manually positioned
                         
                         fig.add_annotation(
-                            x=xf.iloc[mid_idx],
-                            y=y_fit.iloc[mid_idx],
+                            x=annot_x,
+                            y=annot_y,
                             text=eq_text,
                             showarrow=True,
                             arrowhead=2,
                             arrowsize=1,
                             arrowwidth=2,
                             ax=0,
-                            ay=-40,
+                            ay=ay_offset,
                             bgcolor="rgba(255, 255, 255, 0.8)",
                             bordercolor="black",
                             borderwidth=1,
@@ -803,6 +915,17 @@ def create_plot_interface(plot_id: str, available_datasets: List[Dict[str, Any]]
         final_title = custom_title if custom_title else f"{y_label} vs {x_label}"
         final_xlabel = custom_xlabel if custom_xlabel else x_label
         final_ylabel = custom_ylabel if custom_ylabel else y_label
+
+        # Add Manual Annotation
+        if annot_text:
+             fig.add_annotation(
+                x=annot_x,
+                y=annot_y,
+                text=annot_text,
+                showarrow=False,
+                font=dict(size=annot_size, color=annot_color),
+                bgcolor="rgba(255, 255, 255, 0.5)"
+            )
 
         # Determine Theme
         final_template = template_mode
