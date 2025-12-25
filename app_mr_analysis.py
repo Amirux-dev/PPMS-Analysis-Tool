@@ -22,12 +22,10 @@ st.markdown("""
             padding-top: 2rem;
             padding-bottom: 1rem;
         }
-        section[data-testid="stSidebar"] {
-            transition: width 0.5s ease-in-out, min-width 0.5s ease-in-out;
-        }
         section[data-testid="stSidebar"][aria-expanded="true"] {
             width: 33vw !important;
             min-width: 33vw !important;
+            transition: width 0.5s ease-in-out, min-width 0.5s ease-in-out;
         }
     </style>
 """, unsafe_allow_html=True)
