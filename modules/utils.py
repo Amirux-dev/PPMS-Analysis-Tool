@@ -13,9 +13,8 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 APP_ROOT = os.path.dirname(BASE_DIR)
 STATE_FILE = os.path.join(APP_ROOT, "session_state.pkl")
 
-def save_session_state():
-    """Saves the current session state to a local pickle file."""
-    
+def get_current_state_dict():
+    """Helper to construct the state dictionary for saving."""
     # Capture plot-specific state that isn't in persistent_values
     plot_states = {}
     if 'plot_ids' in st.session_state:
@@ -25,7 +24,7 @@ def save_session_state():
                 if key in st.session_state:
                     plot_states[key] = st.session_state[key]
 
-    state_to_save = {
+    return {
         'all_datasets': st.session_state.all_datasets,
         'plot_ids': st.session_state.plot_ids,
         'next_plot_id': st.session_state.next_plot_id,
@@ -34,11 +33,37 @@ def save_session_state():
         'batch_counter': st.session_state.batch_counter,
         'plot_states': plot_states
     }
+
+def save_session_state():
+    """Saves the current session state to a local pickle file."""
+    state_to_save = get_current_state_dict()
     try:
         with open(STATE_FILE, 'wb') as f:
             pickle.dump(state_to_save, f)
     except Exception as e:
         print(f"Error saving state: {e}")
+
+def apply_loaded_state(saved_state):
+    """Applies a loaded state dictionary to the current session."""
+    try:
+        st.session_state.all_datasets = saved_state.get('all_datasets', [])
+        st.session_state.plot_ids = saved_state.get('plot_ids', [1])
+        st.session_state.next_plot_id = saved_state.get('next_plot_id', 2)
+        st.session_state.custom_batches = saved_state.get('custom_batches', {})
+        st.session_state.persistent_values = saved_state.get('persistent_values', {})
+        st.session_state.batch_counter = saved_state.get('batch_counter', 0)
+        
+        # Restore plot states
+        if 'plot_states' in saved_state:
+            for k, v in saved_state['plot_states'].items():
+                st.session_state[k] = v
+        
+        # Force save to local disk immediately
+        save_session_state()
+        return True
+    except Exception as e:
+        st.error(f"Error applying state: {e}")
+        return False
 
 def load_session_state():
     """Loads session state from local pickle file if it exists."""
@@ -49,19 +74,7 @@ def load_session_state():
             
             # Restore if keys are missing or empty
             if not st.session_state.all_datasets and saved_state.get('all_datasets'):
-                st.session_state.all_datasets = saved_state.get('all_datasets', [])
-                st.session_state.plot_ids = saved_state.get('plot_ids', [1])
-                st.session_state.next_plot_id = saved_state.get('next_plot_id', 2)
-                st.session_state.custom_batches = saved_state.get('custom_batches', {})
-                st.session_state.persistent_values = saved_state.get('persistent_values', {})
-                st.session_state.batch_counter = saved_state.get('batch_counter', 0)
-                
-                # Restore plot states
-                if 'plot_states' in saved_state:
-                    for k, v in saved_state['plot_states'].items():
-                        st.session_state[k] = v
-                
-                return True
+                return apply_loaded_state(saved_state)
         except Exception as e:
             st.error(f"Error loading state: {e}")
     return False
