@@ -605,7 +605,7 @@ else:
 with st.expander("Layout & Export Settings", expanded=True):
     col_lay1, col_lay2, col_lay3 = st.columns(3)
     with col_lay1:
-        num_cols = st.number_input("Columns per Row", min_value=1, max_value=3, value=1)
+        num_cols = st.number_input("Columns per Row", min_value=1, max_value=3, value=2)
     with col_lay2:
         plot_width = st.number_input("Plot Width (px)", min_value=300, value=600)
     with col_lay3:
