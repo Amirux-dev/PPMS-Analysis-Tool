@@ -22,6 +22,9 @@ st.markdown("""
             padding-top: 2rem;
             padding-bottom: 1rem;
         }
+        section[data-testid="stSidebar"] {
+            transition: width 0.3s ease;
+        }
         section[data-testid="stSidebar"][aria-expanded="true"] {
             width: 33vw;
         }
