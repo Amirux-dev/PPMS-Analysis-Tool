@@ -20,7 +20,7 @@ def save_session_state():
     plot_states = {}
     if 'plot_ids' in st.session_state:
         for pid in st.session_state.plot_ids:
-            for prefix in ["sel_", "batch_filter_", "pname_", "ren_mode_"]:
+            for prefix in ["sel_", "batch_filter_", "pname_", "ren_mode_", "annotations_list_"]:
                 key = f"{prefix}{pid}"
                 if key in st.session_state:
                     plot_states[key] = st.session_state[key]

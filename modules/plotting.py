@@ -39,6 +39,8 @@ def perform_paste(plot_id, key_x, key_y, is_persistent_widget=False):
         
         st.session_state[wkey_x] = val_x
         st.session_state[wkey_y] = val_y
+        
+        save_session_state()
     else:
         # Logic for standard widgets
         st.session_state[key_x] = val_x
@@ -511,11 +513,10 @@ def create_plot_interface(plot_id: str, available_datasets: List[Dict[str, Any]]
                         
                         for fid in selected_fit_ids:
                             st.caption(f"Settings for: {fit_options[fid]}")
-                            c_fc, c_fs = st.columns(2)
+                            c_fc, c_fs, c_fw = st.columns(3)
                             with c_fc: f_color = persistent_input(st.color_picker, f"fit_col_{plot_id}_{fid}", label="Line Color", value="#FF0000")
-                            with c_fs: 
-                                f_style = persistent_selectbox("Line Style", ["dash", "solid", "dot", "dashdot"], index=0, persistent_key=f"fit_style_{plot_id}_{fid}")
-                                f_width = persistent_input(st.number_input, f"fit_width_{plot_id}_{fid}", label="Width", value=2.0, step=0.5)
+                            with c_fs: f_style = persistent_selectbox("Line Style", ["dash", "solid", "dot", "dashdot"], index=0, persistent_key=f"fit_style_{plot_id}_{fid}")
+                            with c_fw: f_width = persistent_input(st.number_input, f"fit_width_{plot_id}_{fid}", label="Width", value=2.0, step=0.5)
                             
                             c_ax, c_ay, c_btn = st.columns([1, 1, 1], vertical_alignment="bottom")
                             with c_ax: f_annot_x = persistent_input(st.number_input, f"fit_ax_{plot_id}_{fid}", label="Annot X", value=None, placeholder="Auto", format=x_fmt, step=x_step)
@@ -562,11 +563,10 @@ def create_plot_interface(plot_id: str, available_datasets: List[Dict[str, Any]]
 
                         for fid in selected_pfit_ids:
                             st.caption(f"Settings for: {fit_options[fid]}")
-                            c_fc, c_fs = st.columns(2)
+                            c_fc, c_fs, c_fw = st.columns(3)
                             with c_fc: pf_color = persistent_input(st.color_picker, f"pfit_col_{plot_id}_{fid}", label="Line Color", value="#00FF00")
-                            with c_fs: 
-                                pf_style = persistent_selectbox("Line Style", ["dot", "solid", "dash", "dashdot"], index=0, persistent_key=f"pfit_style_{plot_id}_{fid}")
-                                pf_width = persistent_input(st.number_input, f"pfit_width_{plot_id}_{fid}", label="Width", value=3.0, step=0.5)
+                            with c_fs: pf_style = persistent_selectbox("Line Style", ["dot", "solid", "dash", "dashdot"], index=0, persistent_key=f"pfit_style_{plot_id}_{fid}")
+                            with c_fw: pf_width = persistent_input(st.number_input, f"pfit_width_{plot_id}_{fid}", label="Width", value=3.0, step=0.5)
                             
                             c_ax, c_ay, c_btn = st.columns([1, 1, 1], vertical_alignment="bottom")
                             with c_ax: pf_annot_x = persistent_input(st.number_input, f"pfit_ax_{plot_id}_{fid}", label="Annot X", value=None, placeholder="Auto", format=x_fmt, step=x_step)
