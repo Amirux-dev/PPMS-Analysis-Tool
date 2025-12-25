@@ -88,7 +88,9 @@ with st.sidebar.expander("⚙️ General Settings", expanded=False):
         
         # Mailto Link
         subject = urllib.parse.quote("PPMS Analysis Session")
-        body_text = f"Hi,\n\nI'm working on a PPMS analysis. You can join my session using this ID:\n\n{sess_id}\n\n(Append ?session_id={sess_id} to the application URL)"
+        base_url = "https://ppms-analysis-tool.streamlit.app/"
+        full_url = f"{base_url}?session_id={sess_id}"
+        body_text = f"Hi,\n\nI'm working on a PPMS analysis. You can join my session by clicking this link:\n\n{full_url}"
         body = urllib.parse.quote(body_text)
         mailto_link = f"mailto:?subject={subject}&body={body}"
         
