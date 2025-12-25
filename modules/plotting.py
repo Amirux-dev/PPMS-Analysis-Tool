@@ -493,17 +493,14 @@ def create_plot_interface(plot_id: str, available_datasets: List[Dict[str, Any]]
                             st.caption(f"Sel: {last_click['x']:.2f}, {last_click['y']:.2f}")
                         else:
                             st.caption("No point selected")
-                            
-                        if st.button("📍 Paste Click", key=f"paste_click_{plot_id}_{i}", help=help_text):
-                            if last_click:
-                                annot["x"] = last_click["x"]
-                                annot["y"] = last_click["y"]
-                                # Force update of the widgets
-                                st.session_state[f"annot_x_{plot_id}_{i}"] = last_click["x"]
-                                st.session_state[f"annot_y_{plot_id}_{i}"] = last_click["y"]
-                                st.rerun()
-                            else:
-                                st.warning("Click a point on the plot first!")
+                        
+                        def paste_callback(pid, idx):
+                            lc = st.session_state.get(f"last_click_{pid}")
+                            if lc:
+                                st.session_state[f"annot_x_{pid}_{idx}"] = lc["x"]
+                                st.session_state[f"annot_y_{pid}_{idx}"] = lc["y"]
+
+                        st.button("📍 Paste Click", key=f"paste_click_{plot_id}_{i}", help=help_text, on_click=paste_callback, args=(plot_id, i))
 
                     c_col, c_size = st.columns(2)
                     with c_col:
@@ -511,7 +508,7 @@ def create_plot_interface(plot_id: str, available_datasets: List[Dict[str, Any]]
                     with c_size:
                         annot["size"] = st.number_input("Size", value=int(annot["size"]), min_value=5, key=f"annot_sz_{plot_id}_{i}")
                     
-                    c_font, c_style = st.columns([2, 1])
+                    c_font, c_style = st.columns([2, 1], vertical_alignment="bottom")
                     with c_font:
                         annot["font"] = st.selectbox("Font", ["Arial", "Times New Roman", "Courier New", "Verdana", "Georgia"], index=0 if annot["font"] == "Arial" else 1, key=f"annot_font_{plot_id}_{i}")
                     with c_style:
