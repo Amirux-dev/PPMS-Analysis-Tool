@@ -468,23 +468,27 @@ def create_plot_interface(plot_id: str, available_datasets: List[Dict[str, Any]]
                 to_delete = []
                 for i, annot in enumerate(st.session_state[f"annotations_list_{plot_id}"]):
                     st.markdown(f"**Annotation {i+1}**")
-                    c1, c2 = st.columns([3, 1])
+                    c1, c2 = st.columns([0.85, 0.15], vertical_alignment="bottom")
                     with c1:
                         annot["text"] = st.text_input(f"Text", value=annot["text"], key=f"annot_txt_{plot_id}_{i}")
                     with c2:
                         if st.button("🗑️", key=f"del_annot_{plot_id}_{i}"):
                             to_delete.append(i)
                     
-                    c_xy1, c_xy2, c_btn = st.columns([1, 1, 1])
+                    c_xy1, c_xy2, c_btn = st.columns([1, 1, 1], vertical_alignment="bottom")
                     with c_xy1:
                         annot["x"] = st.number_input("X", value=float(annot["x"]), format="%.4f", key=f"annot_x_{plot_id}_{i}")
                     with c_xy2:
                         annot["y"] = st.number_input("Y", value=float(annot["y"]), format="%.4f", key=f"annot_y_{plot_id}_{i}")
                     with c_btn:
-                        st.write("")
-                        st.write("")
-                        if st.button("📍 Paste Click", key=f"paste_click_{plot_id}_{i}", help="1. Click a point on the plot.\n2. Click this button to paste coordinates."):
-                            last_click = st.session_state.get(f"last_click_{plot_id}")
+                        last_click = st.session_state.get(f"last_click_{plot_id}")
+                        help_text = "1. Click a data point on the plot.\n2. Click this button to paste coordinates."
+                        if last_click:
+                            st.caption(f"Sel: {last_click['x']:.2f}, {last_click['y']:.2f}")
+                        else:
+                            st.caption("No point selected")
+                            
+                        if st.button("📍 Paste Click", key=f"paste_click_{plot_id}_{i}", help=help_text):
                             if last_click:
                                 annot["x"] = last_click["x"]
                                 annot["y"] = last_click["y"]
@@ -721,9 +725,42 @@ def create_plot_interface(plot_id: str, available_datasets: List[Dict[str, Any]]
                 export_msg_placeholder.empty() # Clear the initial message
                 
                 st.write("")
-                c_left, c_center, c_right = st.columns([1, 2, 1])
-                with c_center:
-                    df_export = pd.DataFrame(dict([ (k,pd.Series(v)) for k,v in export_data.items() ]))
+                
+                df_export = pd.DataFrame(dict([ (k,pd.Series(v)) for k,v in export_data.items() ]))
+                
+                # 1. DAT Export (Blue)
+                with st.container():
+                    st.info("📄 **DAT Export** (Tab-separated values)")
                     dat_exp = df_export.to_csv(index=False, sep='\t').encode('utf-8')
-                    st.download_button(label=f"Download {plot_name} Data (.dat)", data=dat_exp, file_name=f"{safe_title}_data.dat", mime="text/plain", width='stretch')
+                    st.download_button(
+                        label=f"Download {plot_name} Data (.dat)",
+                        data=dat_exp,
+                        file_name=f"{safe_title}.dat",
+                        mime="text/plain",
+                        key=f"dl_dat_{plot_id}"
+                    )
+
+                # 2. CSV Export (Green)
+                with st.container():
+                    st.success("📊 **CSV Export** (Comma-separated values)")
+                    csv_exp = df_export.to_csv(index=False, sep=',').encode('utf-8')
+                    st.download_button(
+                        label=f"Download {plot_name} Data (.csv)",
+                        data=csv_exp,
+                        file_name=f"{safe_title}.csv",
+                        mime="text/csv",
+                        key=f"dl_csv_{plot_id}"
+                    )
+
+                # 3. HTML Export (Orange/Warning)
+                with st.container():
+                    st.warning("🌐 **HTML Export** (Interactive Plot)")
+                    html_exp = fig.to_html(include_plotlyjs="cdn", full_html=True)
+                    st.download_button(
+                        label=f"Download {plot_name} Plot (.html)",
+                        data=html_exp,
+                        file_name=f"{safe_title}.html",
+                        mime="text/html",
+                        key=f"dl_html_{plot_id}"
+                    )
         return fig
