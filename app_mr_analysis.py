@@ -12,7 +12,8 @@ from modules.data_processing import parse_multivu_content
 from modules.utils import (
     save_session_state, load_session_state, init_session_state, recover_session_state,
     persistent_selectbox, persistent_input, get_current_state_dict, apply_loaded_state,
-    list_projects, load_project_file, save_current_project, delete_project_file, import_project_file
+    list_projects, load_project_file, save_current_project, delete_project_file, import_project_file,
+    clear_session_cache
 )
 import pickle
 from modules.plotting import create_plot_interface, get_batch_map
@@ -42,13 +43,16 @@ st.markdown("""
 if 'session_id' not in st.session_state:
     # Try to get from URL
     params = st.query_params
-    if 'session_id' in params:
-        st.session_state.session_id = params['session_id']
+    url_session_id = params.get('session_id')
+    
+    if url_session_id:
+        st.session_state.session_id = url_session_id
     else:
-        # Generate new ID
+        # Generate new ID and FORCE RERUN to lock it in URL
         new_id = str(uuid.uuid4())
         st.session_state.session_id = new_id
         st.query_params['session_id'] = new_id
+        st.rerun()
 
 init_session_state()
 # Load previous state if available (Session Specific)
@@ -70,6 +74,13 @@ st.markdown("Upload `.dat` files to visualize and analyze transport measurements
 with st.sidebar.expander("⚙️ General Settings", expanded=False):
     global_field_unit = st.selectbox("Default Field Unit", ["Tesla (T)", "Oersted (Oe)"], index=0, key="global_field_unit")
     global_r0_method = st.selectbox("Default R0 Method", ["Closest to 0T", "Mean within Window", "First Point", "Max Resistance"], index=0, key="global_r0_method")
+    
+    st.markdown("---")
+    st.caption(f"Session ID: `{st.session_state.get('session_id', 'Unknown')[:8]}...`")
+    if st.button("⚠️ Reset Session", help="Clear all data and start fresh"):
+        clear_session_cache()
+        st.session_state.clear()
+        st.rerun()
 
 # --- Sidebar: Project Management ---
 with st.sidebar.expander("💾 Project Management", expanded=False):

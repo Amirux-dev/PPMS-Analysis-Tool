@@ -22,7 +22,9 @@ if not os.path.exists(CACHE_DIR):
 
 def get_session_file_path():
     """Returns the path to the session-specific recovery file."""
-    session_id = st.session_state.get('session_id', 'unknown')
+    session_id = st.session_state.get('session_id')
+    if not session_id:
+        return None
     return os.path.join(CACHE_DIR, f"session_{session_id}.pkl")
 
 def get_current_state_dict():
@@ -51,13 +53,14 @@ def save_session_state(save_to_project=True):
     state_to_save = get_current_state_dict()
     
     # 1. Session-Specific Recovery File (Safe for multi-user)
-    try:
-        recovery_path = get_session_file_path()
-        with open(recovery_path, 'wb') as f:
-            pickle.dump(state_to_save, f)
-    except Exception as e:
-        # Fail silently for recovery save
-        pass
+    recovery_path = get_session_file_path()
+    if recovery_path:
+        try:
+            with open(recovery_path, 'wb') as f:
+                pickle.dump(state_to_save, f)
+        except Exception as e:
+            # Fail silently for recovery save
+            pass
 
     # 2. Auto-save to Project File
     if save_to_project:
@@ -142,7 +145,7 @@ def load_session_state():
     Loads session state from session-specific pickle file if it exists.
     """
     recovery_path = get_session_file_path()
-    if os.path.exists(recovery_path):
+    if recovery_path and os.path.exists(recovery_path):
         try:
             with open(recovery_path, 'rb') as f:
                 saved_state = pickle.load(f)
@@ -152,6 +155,17 @@ def load_session_state():
                 return apply_loaded_state(saved_state)
         except Exception as e:
             st.error(f"Error loading state: {e}")
+    return False
+
+def clear_session_cache():
+    """Clears the recovery file for the current session."""
+    recovery_path = get_session_file_path()
+    if recovery_path and os.path.exists(recovery_path):
+        try:
+            os.remove(recovery_path)
+            return True
+        except Exception:
+            pass
     return False
 
 def recover_session_state():
