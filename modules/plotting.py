@@ -197,7 +197,7 @@ def create_plot_interface(plot_id: str, available_datasets: List[Dict[str, Any]]
         if widget_sel_key in st.session_state:
             st.session_state[persistent_sel_key] = st.session_state[widget_sel_key]
         
-        selected_filenames = st.multiselect(f"Select Curves for Plot {plot_id}", options=combined_options, default=current_selection, key=widget_sel_key, on_change=save_session_state)
+        selected_filenames = st.multiselect(f"Select Curves for {plot_name}", options=combined_options, default=current_selection, key=widget_sel_key, on_change=save_session_state)
         selected_datasets = [d for d in available_datasets if d['fileName'] in selected_filenames]
 
         # --- TABS LAYOUT ---
@@ -307,7 +307,6 @@ def create_plot_interface(plot_id: str, available_datasets: List[Dict[str, Any]]
                     plot_derivative = persistent_input(st.toggle, f"deriv_{plot_id}", label="Derivative", value=False, help="Plot dY/dX vs X")
 
             if show_linear_fit or show_parabolic_fit:
-                st.markdown("---")
                 st.markdown("###### Fit Settings")
                 if show_linear_fit:
                     with st.expander("Linear Fit Configuration", expanded=True):
@@ -366,8 +365,7 @@ def create_plot_interface(plot_id: str, available_datasets: List[Dict[str, Any]]
                         
                         curve_settings[d['id']] = {"color": curve_color, "smoothing": curve_smooth}
 
-            st.markdown("---")
-            with st.expander("Plot Appearance", expanded=False):
+            with st.expander("**Plot Appearance**", expanded=False):
                 col_cust1, col_cust2, col_cust3 = st.columns(3)
                 with col_cust1:
                     custom_title = persistent_input(st.text_input, f"title_{plot_id}", label="Plot Title", value="", placeholder="Auto")
@@ -380,7 +378,7 @@ def create_plot_interface(plot_id: str, available_datasets: List[Dict[str, Any]]
                     if "Lines" in plot_mode: line_width = persistent_input(st.number_input, f"lw_{plot_id}", label="Line Width", value=2.0, step=0.5)
                     if "Markers" in plot_mode: marker_size = persistent_input(st.number_input, f"ms_{plot_id}", label="Marker Size", value=6, step=1)
 
-            with st.expander("Axes", expanded=False):
+            with st.expander("**Axes**", expanded=False):
                 col_cust4, col_cust5, col_cust6 = st.columns(3)
                 with col_cust4:
                     custom_xlabel = persistent_input(st.text_input, f"xlabel_{plot_id}", label="X Label", value="", placeholder="Auto")
@@ -406,7 +404,7 @@ def create_plot_interface(plot_id: str, available_datasets: List[Dict[str, Any]]
                     show_grid = persistent_input(st.checkbox, f"grid_{plot_id}", label="Show Grid", value=True)
                     grid_color = persistent_input(st.color_picker, f"grid_color_{plot_id}", label="Grid Color", value="#E5E5E5")
 
-            with st.expander("Text Annotation", expanded=False):
+            with st.expander("**Text Annotation**", expanded=False):
                 annot_text = persistent_input(st.text_input, f"annot_txt_{plot_id}", label="Text", value="")
                 if annot_text:
                     st.caption("Note: Drag & Drop is not supported. Please adjust X/Y coordinates manually.")
@@ -617,5 +615,5 @@ def create_plot_interface(plot_id: str, available_datasets: List[Dict[str, Any]]
                 with c_center:
                     df_export = pd.DataFrame(dict([ (k,pd.Series(v)) for k,v in export_data.items() ]))
                     dat_exp = df_export.to_csv(index=False, sep='\t').encode('utf-8')
-                    st.download_button(label=f"Download Plot {plot_id} Data (.dat)", data=dat_exp, file_name=f"plot_{plot_id}_data.dat", mime="text/plain", width='stretch')
+                    st.download_button(label=f"Download {plot_name} Data (.dat)", data=dat_exp, file_name=f"{safe_title}_data.dat", mime="text/plain", width='stretch')
         return fig
