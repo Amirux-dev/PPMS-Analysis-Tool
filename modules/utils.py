@@ -186,6 +186,19 @@ def init_session_state():
 # UI HELPERS
 # -----------------------------------------------------------------------------
 
+def import_project_file(filename, content):
+    """Saves uploaded content to the projects directory."""
+    if not filename.endswith('.ppms'):
+        filename += '.ppms'
+    path = os.path.join(PROJECTS_DIR, filename)
+    try:
+        with open(path, 'wb') as f:
+            f.write(content)
+        return True
+    except Exception as e:
+        st.error(f"Error importing project: {e}")
+        return False
+
 def persistent_selectbox(label, options, persistent_key, **kwargs):
     """
     A wrapper around st.selectbox that persists its value across reruns 

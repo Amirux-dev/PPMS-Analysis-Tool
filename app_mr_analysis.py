@@ -11,7 +11,7 @@ from modules.data_processing import parse_multivu_content
 from modules.utils import (
     save_session_state, load_session_state, init_session_state, recover_session_state,
     persistent_selectbox, persistent_input, get_current_state_dict, apply_loaded_state,
-    list_projects, load_project_file, save_current_project, delete_project_file
+    list_projects, load_project_file, save_current_project, delete_project_file, import_project_file
 )
 import pickle
 from modules.plotting import create_plot_interface, get_batch_map
@@ -60,7 +60,19 @@ with st.sidebar.expander("⚙️ General Settings", expanded=False):
 
 # --- Sidebar: Project Management ---
 with st.sidebar.expander("💾 Project Management", expanded=False):
-    # 1. Project Selector
+    
+    # 1. Import Section
+    uploaded_projs = st.file_uploader("Import .ppms projects", type=["ppms"], accept_multiple_files=True, key=f"imp_proj_{st.session_state.get('proj_import_key',0)}", help="Add existing projects to your workspace.")
+    if uploaded_projs:
+        for up in uploaded_projs:
+            import_project_file(up.name, up.getvalue())
+        st.session_state.proj_import_key = st.session_state.get('proj_import_key', 0) + 1
+        st.toast(f"Imported {len(uploaded_projs)} projects!", icon="📥")
+        st.rerun()
+
+    st.markdown("---")
+
+    # 2. Project Selector
     projects = list_projects()
     active_proj = st.session_state.get('active_project')
     
@@ -90,7 +102,7 @@ with st.sidebar.expander("💾 Project Management", expanded=False):
             st.toast(f"Loaded {selected_proj}", icon="📂")
             st.rerun()
 
-    # 2. Project Actions
+    # 3. Project Actions
     c_new, c_del = st.columns([0.7, 0.3])
     with c_new:
         if st.button("✨ New Project", width='stretch'):
@@ -109,7 +121,7 @@ with st.sidebar.expander("💾 Project Management", expanded=False):
 
     st.markdown("---")
 
-    # 3. Save / Auto-save Logic
+    # 4. Save / Auto-save Logic
     if active_proj:
         st.caption(f"Editing: **{active_proj}**")
         st.checkbox("Auto-save changes", value=True, key="autosave_enabled", help="Automatically save changes to the project file.")
