@@ -38,8 +38,20 @@ st.markdown("""
 # STREAMLIT APPLICATION
 # -----------------------------------------------------------------------------
 
+# Initialize Session ID for User Isolation & Recovery
+if 'session_id' not in st.session_state:
+    # Try to get from URL
+    params = st.query_params
+    if 'session_id' in params:
+        st.session_state.session_id = params['session_id']
+    else:
+        # Generate new ID
+        new_id = str(uuid.uuid4())
+        st.session_state.session_id = new_id
+        st.query_params['session_id'] = new_id
+
 init_session_state()
-# Load previous state if available
+# Load previous state if available (Session Specific)
 if not st.session_state.all_datasets:
     load_session_state()
 recover_session_state()

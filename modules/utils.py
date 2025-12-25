@@ -11,11 +11,19 @@ import uuid
 # This prevents issues depending on where the streamlit command is run from
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 APP_ROOT = os.path.dirname(BASE_DIR)
-STATE_FILE = os.path.join(APP_ROOT, "session_state.pkl")
+# STATE_FILE = os.path.join(APP_ROOT, "session_state.pkl") # Deprecated
+CACHE_DIR = os.path.join(APP_ROOT, "cache")
 PROJECTS_DIR = os.path.join(APP_ROOT, "projects")
 
 if not os.path.exists(PROJECTS_DIR):
     os.makedirs(PROJECTS_DIR)
+if not os.path.exists(CACHE_DIR):
+    os.makedirs(CACHE_DIR)
+
+def get_session_file_path():
+    """Returns the path to the session-specific recovery file."""
+    session_id = st.session_state.get('session_id', 'unknown')
+    return os.path.join(CACHE_DIR, f"session_{session_id}.pkl")
 
 def get_current_state_dict():
     """Helper to construct the state dictionary for saving."""
@@ -39,15 +47,17 @@ def get_current_state_dict():
     }
 
 def save_session_state(save_to_project=True):
-    """Saves the current session state to a local pickle file AND active project if autosave is on."""
+    """Saves the current session state to the active project if autosave is on."""
     state_to_save = get_current_state_dict()
     
-    # 1. Save to recovery file (fast, always happens)
+    # 1. Session-Specific Recovery File (Safe for multi-user)
     try:
-        with open(STATE_FILE, 'wb') as f:
+        recovery_path = get_session_file_path()
+        with open(recovery_path, 'wb') as f:
             pickle.dump(state_to_save, f)
     except Exception as e:
-        print(f"Error saving recovery state: {e}")
+        # Fail silently for recovery save
+        pass
 
     # 2. Auto-save to Project File
     if save_to_project:
@@ -128,10 +138,13 @@ def apply_loaded_state(saved_state):
         return False
 
 def load_session_state():
-    """Loads session state from local pickle file if it exists."""
-    if os.path.exists(STATE_FILE):
+    """
+    Loads session state from session-specific pickle file if it exists.
+    """
+    recovery_path = get_session_file_path()
+    if os.path.exists(recovery_path):
         try:
-            with open(STATE_FILE, 'rb') as f:
+            with open(recovery_path, 'rb') as f:
                 saved_state = pickle.load(f)
             
             # Restore if keys are missing or empty
