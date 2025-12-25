@@ -92,7 +92,9 @@ L'application est disponible en ligne à l'adresse : **[https://ppms-analysis-to
     *   Ajustement linéaire et parabolique.
 
 #### 🗂️ Gestion de Fichiers
-*   **Organisation par Dossiers** : Les imports sont automatiquement organisés dans des dossiers séquentiels "Batch Import #N".
+*   **Organisation par Dossiers** : 
+    *   **Import Unique** : Les fichiers importés un par un vont dans "📂 File by File Import".
+    *   **Import Multiple** : Les imports de plusieurs fichiers (ou dossiers) créent un nouveau "📂 Batch Import #N".
 *   **Gestion des Doublons** : Choisissez d'**Ignorer** ou d'**Écraser** les fichiers existants lors de l'upload. L'écrasement met à jour les graphiques en temps réel.
 *   **Actions par Lot** : Déplacez ou supprimez plusieurs fichiers simultanément avec **Filtrage par Dossier**.
 *   **Détection de Métadonnées** : Extraction automatique de la Température, du Champ et du nom de l'échantillon depuis le nom du fichier.

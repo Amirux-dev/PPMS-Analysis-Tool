@@ -517,7 +517,7 @@ def create_plot_interface(plot_id: str, available_datasets: List[Dict[str, Any]]
                                 f_style = persistent_selectbox("Line Style", ["dash", "solid", "dot", "dashdot"], index=0, persistent_key=f"fit_style_{plot_id}_{fid}")
                                 f_width = persistent_input(st.number_input, f"fit_width_{plot_id}_{fid}", label="Width", value=2.0, step=0.5)
                             
-                            c_ax, c_ay, c_btn = st.columns([1, 1, 1])
+                            c_ax, c_ay, c_btn = st.columns([1, 1, 1], vertical_alignment="bottom")
                             with c_ax: f_annot_x = persistent_input(st.number_input, f"fit_ax_{plot_id}_{fid}", label="Annot X", value=None, placeholder="Auto", format=x_fmt, step=x_step)
                             with c_ay: f_annot_y = persistent_input(st.number_input, f"fit_ay_{plot_id}_{fid}", label="Annot Y", value=None, placeholder="Auto", format=y_fmt, step=y_step)
                             with c_btn:
@@ -568,7 +568,7 @@ def create_plot_interface(plot_id: str, available_datasets: List[Dict[str, Any]]
                                 pf_style = persistent_selectbox("Line Style", ["dot", "solid", "dash", "dashdot"], index=0, persistent_key=f"pfit_style_{plot_id}_{fid}")
                                 pf_width = persistent_input(st.number_input, f"pfit_width_{plot_id}_{fid}", label="Width", value=3.0, step=0.5)
                             
-                            c_ax, c_ay, c_btn = st.columns([1, 1, 1])
+                            c_ax, c_ay, c_btn = st.columns([1, 1, 1], vertical_alignment="bottom")
                             with c_ax: pf_annot_x = persistent_input(st.number_input, f"pfit_ax_{plot_id}_{fid}", label="Annot X", value=None, placeholder="Auto", format=x_fmt, step=x_step)
                             with c_ay: pf_annot_y = persistent_input(st.number_input, f"pfit_ay_{plot_id}_{fid}", label="Annot Y", value=None, placeholder="Auto", format=y_fmt, step=y_step)
                             with c_btn:
@@ -874,7 +874,7 @@ def create_plot_interface(plot_id: str, available_datasets: List[Dict[str, Any]]
                         if annot_x_f is None or annot_y_f is None:
                             mid_idx = len(xf) // 2
                             annot_x_f, annot_y_f, ay_offset = xf.iloc[mid_idx], y_fit.iloc[mid_idx], -40
-                        else: ay_offset = 0
+                        else: ay_offset = -40
                         
                         fig.add_annotation(x=annot_x_f, y=annot_y_f, text=f"<b>y = {slope:.3e} x + {intercept:.3e}</b>", showarrow=True, arrowhead=2, arrowsize=1, arrowwidth=2, arrowcolor=f_col, ax=0, ay=ay_offset, bgcolor="rgba(255, 255, 255, 0.8)", bordercolor=f_col, borderwidth=1, font=dict(size=14, color=f_col))
 
@@ -901,7 +901,7 @@ def create_plot_interface(plot_id: str, available_datasets: List[Dict[str, Any]]
                         if annot_x_pf is None or annot_y_pf is None:
                             mid_idx = len(xpf) // 2
                             annot_x_pf, annot_y_pf, ay_offset = xpf.iloc[mid_idx], y_pfit.iloc[mid_idx], 40
-                        else: ay_offset = 0
+                        else: ay_offset = -40
 
                         fig.add_annotation(x=annot_x_pf, y=annot_y_pf, text=f"<b>y = {a:.2e} x² + {b:.2e} x + {c:.2e}</b>", showarrow=True, arrowhead=2, arrowsize=1, arrowwidth=2, arrowcolor=pf_col, ax=0, ay=ay_offset, bgcolor="rgba(255, 255, 255, 0.8)", bordercolor=pf_col, borderwidth=1, font=dict(size=14, color=pf_col))
 

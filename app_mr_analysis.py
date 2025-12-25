@@ -64,10 +64,16 @@ uploaded_files = st.sidebar.file_uploader(
 
 # Process Uploaded Files
 if uploaded_files:
-    # Always create a new batch for every import action
-    st.session_state.batch_counter += 1
-    batch_id = st.session_state.batch_counter
-    batch_name = f"📂 Batch Import #{batch_id}"
+    # Determine Batch Strategy
+    if len(uploaded_files) == 1:
+        # Single file -> "File by File Import" (ID 0)
+        batch_id = 0
+        batch_name = "📂 File by File Import"
+    else:
+        # Multiple files -> New Sequential Batch
+        st.session_state.batch_counter += 1
+        batch_id = st.session_state.batch_counter
+        batch_name = f"📂 Batch Import #{batch_id}"
     
     new_files_count = 0
     updated_files_count = 0
