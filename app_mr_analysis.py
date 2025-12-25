@@ -88,11 +88,10 @@ with st.sidebar.expander("💾 Project Management", expanded=False):
         proj_index = 0
     
     selected_proj = st.selectbox(
-        "Current Project", 
+        "📂 Workspace Projects", 
         options, 
         index=proj_index, 
-        key="project_selector",
-        label_visibility="collapsed"
+        key="project_selector"
     )
     
     # Handle Project Switching
@@ -121,14 +120,29 @@ with st.sidebar.expander("💾 Project Management", expanded=False):
 
     st.markdown("---")
 
-    # 4. Save / Auto-save Logic
+    # 4. Save / Download Logic
     if active_proj:
         st.caption(f"Editing: **{active_proj}**")
         st.checkbox("Auto-save changes", value=True, key="autosave_enabled", help="Automatically save changes to the project file.")
         
-        if st.button("💾 Force Save", width='stretch'):
-            if save_current_project(active_proj):
-                st.toast("Project saved!", icon="✅")
+        c_save, c_dl = st.columns(2)
+        with c_save:
+            if st.button("💾 Force Save", width='stretch'):
+                if save_current_project(active_proj):
+                    st.toast("Project saved!", icon="✅")
+        with c_dl:
+            # Prepare download data from current state
+            state_dict = get_current_state_dict()
+            pickle_data = pickle.dumps(state_dict)
+            st.download_button(
+                label="📥 Download",
+                data=pickle_data,
+                file_name=active_proj,
+                mime="application/octet-stream",
+                width='stretch',
+                help="Download this project as a .ppms file"
+            )
+            
     else:
         st.caption("Save this session as a new project:")
         col_name, col_save = st.columns([0.65, 0.35])
