@@ -129,7 +129,7 @@ def duplicate_plot_callback(plot_id):
     # Copy state
     for key in list(st.session_state.keys()):
         # Exclude buttons and temporary states
-        if any(x in key for x in ["dup_", "add_btn_", "del_btn_", "ren_btn_", "paste_", "add_annot_btn_", "del_annot_", "dl_", "chart_", "ren_mode_"]): continue
+        if any(x in key for x in ["dup_", "add_btn_", "del_btn_", "ren_btn_", "paste_", "add_annot_btn_", "del_annot_", "dl_", "chart_", "ren_mode_", "del_batch_", "rename_"]): continue
         
         new_key = None
         # Case 1: Key ends with _{plot_id} (Standard widgets)
@@ -337,18 +337,23 @@ def create_plot_interface(plot_id: str, available_datasets: List[Dict[str, Any]]
 
                 display_cols = list(ref_cols)
                 if any("Oe" in c or "Oersted" in c for c in ref_cols): display_cols.append("Magnetic Field (T)")
+                
+                if not display_cols:
+                    st.warning("No columns available for plotting. Please check the data file.")
+                    custom_y_col = None
+                    custom_x_col = None
+                else:
+                    def get_smart_index(cols, keywords):
+                        for i, c in enumerate(cols):
+                            if any(k in c.lower() for k in keywords): return i
+                        return 0
 
-                def get_smart_index(cols, keywords):
-                    for i, c in enumerate(cols):
-                        if any(k in c.lower() for k in keywords): return i
-                    return 0
+                    default_y_idx = get_smart_index(display_cols, ["resist", "ohm", "voltage"])
+                    default_x_idx = get_smart_index(display_cols, ["temp", "field", "tesla", "oe"])
+                    if default_x_idx == default_y_idx and len(display_cols) > 1: default_x_idx = (default_y_idx + 1) % len(display_cols)
 
-                default_y_idx = get_smart_index(display_cols, ["resist", "ohm", "voltage"])
-                default_x_idx = get_smart_index(display_cols, ["temp", "field", "tesla", "oe"])
-                if default_x_idx == default_y_idx and len(display_cols) > 1: default_x_idx = (default_y_idx + 1) % len(display_cols)
-
-                with c1: custom_y_col = persistent_selectbox("Y Column", display_cols, index=default_y_idx, persistent_key=f"y_col_{plot_id}")
-                with c2: custom_x_col = persistent_selectbox("X Column", display_cols, index=default_x_idx, persistent_key=f"x_col_{plot_id}")
+                    with c1: custom_y_col = persistent_selectbox("Y Column", display_cols, index=default_y_idx, persistent_key=f"y_col_{plot_id}")
+                    with c2: custom_x_col = persistent_selectbox("X Column", display_cols, index=default_x_idx, persistent_key=f"x_col_{plot_id}")
 
         # --- PRE-CALCULATE DATA RANGES FOR ANNOTATION SCALING ---
         global_x_min, global_x_max = float('inf'), float('-inf')
