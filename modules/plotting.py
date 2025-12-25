@@ -367,60 +367,61 @@ def create_plot_interface(plot_id: str, available_datasets: List[Dict[str, Any]]
                         curve_settings[d['id']] = {"color": curve_color, "smoothing": curve_smooth}
 
             st.markdown("---")
-            st.markdown("###### Plot Appearance")
-            col_cust1, col_cust2, col_cust3 = st.columns(3)
-            with col_cust1:
-                custom_title = persistent_input(st.text_input, f"title_{plot_id}", label="Plot Title", value="", placeholder="Auto")
-                title_font_size = persistent_input(st.number_input, f"title_font_{plot_id}", label="Title Size", value=20, min_value=10)
-            with col_cust2:
-                template_mode = persistent_selectbox("Theme", ["Auto (Global)", "plotly_white", "plotly", "plotly_dark", "ggplot2", "seaborn", "simple_white", "none"], index=0, persistent_key=f"theme_{plot_id}")
-                show_legend = persistent_input(st.checkbox, f"legend_{plot_id}", label="Show Legend", value=True)
-            with col_cust3:
-                plot_mode = persistent_selectbox("Style", ["Lines", "Markers", "Lines+Markers"], index=0, persistent_key=f"style_{plot_id}")
-                if "Lines" in plot_mode: line_width = persistent_input(st.number_input, f"lw_{plot_id}", label="Line Width", value=2.0, step=0.5)
-                if "Markers" in plot_mode: marker_size = persistent_input(st.number_input, f"ms_{plot_id}", label="Marker Size", value=6, step=1)
+            with st.expander("Plot Appearance", expanded=False):
+                col_cust1, col_cust2, col_cust3 = st.columns(3)
+                with col_cust1:
+                    custom_title = persistent_input(st.text_input, f"title_{plot_id}", label="Plot Title", value="", placeholder="Auto")
+                    title_font_size = persistent_input(st.number_input, f"title_font_{plot_id}", label="Title Size", value=20, min_value=10)
+                with col_cust2:
+                    template_mode = persistent_selectbox("Theme", ["Auto (Global)", "plotly_white", "plotly", "plotly_dark", "ggplot2", "seaborn", "simple_white", "none"], index=0, persistent_key=f"theme_{plot_id}")
+                    show_legend = persistent_input(st.checkbox, f"legend_{plot_id}", label="Show Legend", value=True)
+                with col_cust3:
+                    plot_mode = persistent_selectbox("Style", ["Lines", "Markers", "Lines+Markers"], index=0, persistent_key=f"style_{plot_id}")
+                    if "Lines" in plot_mode: line_width = persistent_input(st.number_input, f"lw_{plot_id}", label="Line Width", value=2.0, step=0.5)
+                    if "Markers" in plot_mode: marker_size = persistent_input(st.number_input, f"ms_{plot_id}", label="Marker Size", value=6, step=1)
 
-            st.markdown("###### Axes")
-            col_cust4, col_cust5, col_cust6 = st.columns(3)
-            with col_cust4:
-                custom_xlabel = persistent_input(st.text_input, f"xlabel_{plot_id}", label="X Label", value="", placeholder="Auto")
-                axis_title_size = persistent_input(st.number_input, f"axis_title_font_{plot_id}", label="Label Size", value=16)
-                use_xlim = persistent_input(st.checkbox, f"use_xlim_{plot_id}", label="Set X Limits")
-                if use_xlim:
-                    c_xmin, c_xmax = st.columns(2)
-                    with c_xmin: xlim_min = persistent_input(st.number_input, f"xlim_min_{plot_id}", label="Min", value=-9.0, format="%.2f")
-                    with c_xmax: xlim_max = persistent_input(st.number_input, f"xlim_max_{plot_id}", label="Max", value=9.0, format="%.2f")
-                else: xlim_min, xlim_max = None, None
+            with st.expander("Axes", expanded=False):
+                col_cust4, col_cust5, col_cust6 = st.columns(3)
+                with col_cust4:
+                    custom_xlabel = persistent_input(st.text_input, f"xlabel_{plot_id}", label="X Label", value="", placeholder="Auto")
+                    axis_title_size = persistent_input(st.number_input, f"axis_title_font_{plot_id}", label="Label Size", value=16)
+                    use_xlim = persistent_input(st.checkbox, f"use_xlim_{plot_id}", label="Set X Limits")
+                    if use_xlim:
+                        c_xmin, c_xmax = st.columns(2)
+                        with c_xmin: xlim_min = persistent_input(st.number_input, f"xlim_min_{plot_id}", label="Min", value=-9.0, format="%.2f")
+                        with c_xmax: xlim_max = persistent_input(st.number_input, f"xlim_max_{plot_id}", label="Max", value=9.0, format="%.2f")
+                    else: xlim_min, xlim_max = None, None
 
-            with col_cust5:
-                custom_ylabel = persistent_input(st.text_input, f"ylabel_{plot_id}", label="Y Label", value="", placeholder="Auto")
-                tick_font_size = persistent_input(st.number_input, f"tick_font_{plot_id}", label="Tick Size", value=14)
-                use_ylim = persistent_input(st.checkbox, f"use_ylim_{plot_id}", label="Set Y Limits")
-                if use_ylim:
-                    c_ymin, c_ymax = st.columns(2)
-                    with c_ymin: ylim_min = persistent_input(st.number_input, f"ylim_min_{plot_id}", label="Min", value=0.0, format="%.2e")
-                    with c_ymax: ylim_max = persistent_input(st.number_input, f"ylim_max_{plot_id}", label="Max", value=100.0, format="%.2e")
-                else: ylim_min, ylim_max = None, None
+                with col_cust5:
+                    custom_ylabel = persistent_input(st.text_input, f"ylabel_{plot_id}", label="Y Label", value="", placeholder="Auto")
+                    tick_font_size = persistent_input(st.number_input, f"tick_font_{plot_id}", label="Tick Size", value=14)
+                    use_ylim = persistent_input(st.checkbox, f"use_ylim_{plot_id}", label="Set Y Limits")
+                    if use_ylim:
+                        c_ymin, c_ymax = st.columns(2)
+                        with c_ymin: ylim_min = persistent_input(st.number_input, f"ylim_min_{plot_id}", label="Min", value=0.0, format="%.2e")
+                        with c_ymax: ylim_max = persistent_input(st.number_input, f"ylim_max_{plot_id}", label="Max", value=100.0, format="%.2e")
+                    else: ylim_min, ylim_max = None, None
 
-            with col_cust6:
-                show_grid = persistent_input(st.checkbox, f"grid_{plot_id}", label="Show Grid", value=True)
-                grid_color = persistent_input(st.color_picker, f"grid_color_{plot_id}", label="Grid Color", value="#E5E5E5")
+                with col_cust6:
+                    show_grid = persistent_input(st.checkbox, f"grid_{plot_id}", label="Show Grid", value=True)
+                    grid_color = persistent_input(st.color_picker, f"grid_color_{plot_id}", label="Grid Color", value="#E5E5E5")
 
-            st.markdown("###### Text Annotation")
-            annot_text = persistent_input(st.text_input, f"annot_txt_{plot_id}", label="Text", value="")
-            if annot_text:
-                st.caption("Note: Drag & Drop is not supported. Please adjust X/Y coordinates manually.")
-                c_ax, c_ay = st.columns(2)
-                with c_ax: annot_x = persistent_input(st.number_input, f"annot_x_{plot_id}", label="X Position", value=0.0, format="%.4f")
-                with c_ay: annot_y = persistent_input(st.number_input, f"annot_y_{plot_id}", label="Y Position", value=0.0, format="%.4f")
-                c_ac, c_as = st.columns(2)
-                with c_ac: annot_color = persistent_input(st.color_picker, f"annot_col_{plot_id}", label="Color", value="#000000")
-                with c_as: annot_size = persistent_input(st.number_input, f"annot_sz_{plot_id}", label="Size", value=14, min_value=8)
+            with st.expander("Text Annotation", expanded=False):
+                annot_text = persistent_input(st.text_input, f"annot_txt_{plot_id}", label="Text", value="")
+                if annot_text:
+                    st.caption("Note: Drag & Drop is not supported. Please adjust X/Y coordinates manually.")
+                    c_ax, c_ay = st.columns(2)
+                    with c_ax: annot_x = persistent_input(st.number_input, f"annot_x_{plot_id}", label="X Position", value=0.0, format="%.4f")
+                    with c_ay: annot_y = persistent_input(st.number_input, f"annot_y_{plot_id}", label="Y Position", value=0.0, format="%.4f")
+                    c_ac, c_as = st.columns(2)
+                    with c_ac: annot_color = persistent_input(st.color_picker, f"annot_col_{plot_id}", label="Color", value="#000000")
+                    with c_as: annot_size = persistent_input(st.number_input, f"annot_sz_{plot_id}", label="Size", value=14, min_value=8)
 
         # --- TAB 4: EXPORT ---
         with tab_export:
             st.markdown("###### Export Data")
-            st.info("Statistics and Download options will appear here after the plot is generated.")
+            export_msg_placeholder = st.empty()
+            export_msg_placeholder.info("Download options will appear here after the plot is generated.")
 
         if not selected_datasets:
             st.info("Select at least one file to display the plot.")
@@ -609,25 +610,8 @@ def create_plot_interface(plot_id: str, available_datasets: List[Dict[str, Any]]
         # --- Statistics Table (In Export Tab) ---
         if export_data:
             with tab_export:
-                with st.expander("📊 Statistics Table", expanded=True):
-                    stats_data = []
-                    for key, val in export_data.items():
-                        if key.endswith("_Y"):
-                            label = key[:-2]
-                            y_vals = val
-                            x_vals = export_data.get(f"{label}_X", [])
-                            if len(y_vals) > 0:
-                                stats_data.append({
-                                    "Curve": label,
-                                    "Min X": f"{np.min(x_vals):.4g}" if len(x_vals) > 0 else "-",
-                                    "Max X": f"{np.max(x_vals):.4g}" if len(x_vals) > 0 else "-",
-                                    "Min Y": f"{np.min(y_vals):.4g}",
-                                    "Max Y": f"{np.max(y_vals):.4g}",
-                                    "Mean Y": f"{np.mean(y_vals):.4g}",
-                                    "Std Dev": f"{np.std(y_vals):.4g}"
-                                })
-                    if stats_data: st.dataframe(pd.DataFrame(stats_data), use_container_width=True, hide_index=True)
-
+                export_msg_placeholder.empty() # Clear the initial message
+                
                 st.write("")
                 c_left, c_center, c_right = st.columns([1, 2, 1])
                 with c_center:
