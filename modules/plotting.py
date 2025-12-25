@@ -461,12 +461,18 @@ def create_plot_interface(plot_id: str, available_datasets: List[Dict[str, Any]]
 
                 if st.button("Add Annotation", key=f"add_annot_btn_{plot_id}"):
                     st.session_state[f"annotations_list_{plot_id}"].append({
-                        "text": "New Text", "x": 0.0, "y": 0.0, "color": "#000000", "size": 14
+                        "text": "New Text", "x": 0.0, "y": 0.0, "color": "#000000", "size": 14,
+                        "bold": False, "italic": False, "font": "Arial"
                     })
                     st.rerun()
 
                 to_delete = []
                 for i, annot in enumerate(st.session_state[f"annotations_list_{plot_id}"]):
+                    # Ensure new keys exist for old annotations
+                    annot.setdefault("bold", False)
+                    annot.setdefault("italic", False)
+                    annot.setdefault("font", "Arial")
+
                     st.markdown(f"**Annotation {i+1}**")
                     c1, c2 = st.columns([0.85, 0.15], vertical_alignment="bottom")
                     with c1:
@@ -492,6 +498,9 @@ def create_plot_interface(plot_id: str, available_datasets: List[Dict[str, Any]]
                             if last_click:
                                 annot["x"] = last_click["x"]
                                 annot["y"] = last_click["y"]
+                                # Force update of the widgets
+                                st.session_state[f"annot_x_{plot_id}_{i}"] = last_click["x"]
+                                st.session_state[f"annot_y_{plot_id}_{i}"] = last_click["y"]
                                 st.rerun()
                             else:
                                 st.warning("Click a point on the plot first!")
@@ -502,6 +511,14 @@ def create_plot_interface(plot_id: str, available_datasets: List[Dict[str, Any]]
                     with c_size:
                         annot["size"] = st.number_input("Size", value=int(annot["size"]), min_value=5, key=f"annot_sz_{plot_id}_{i}")
                     
+                    c_font, c_style = st.columns([2, 1])
+                    with c_font:
+                        annot["font"] = st.selectbox("Font", ["Arial", "Times New Roman", "Courier New", "Verdana", "Georgia"], index=0 if annot["font"] == "Arial" else 1, key=f"annot_font_{plot_id}_{i}")
+                    with c_style:
+                        c_b, c_i = st.columns(2)
+                        with c_b: annot["bold"] = st.checkbox("Bold", value=annot["bold"], key=f"annot_bold_{plot_id}_{i}")
+                        with c_i: annot["italic"] = st.checkbox("Italic", value=annot["italic"], key=f"annot_italic_{plot_id}_{i}")
+
                     st.divider()
 
                 if to_delete:
@@ -700,11 +717,20 @@ def create_plot_interface(plot_id: str, available_datasets: List[Dict[str, Any]]
         if f"annotations_list_{plot_id}" in st.session_state:
             for annot in st.session_state[f"annotations_list_{plot_id}"]:
                 if annot["text"]:
+                    # Apply styling
+                    styled_text = annot["text"]
+                    if annot.get("bold", False): styled_text = f"<b>{styled_text}</b>"
+                    if annot.get("italic", False): styled_text = f"<i>{styled_text}</i>"
+                    
                     fig.add_annotation(
                         x=annot["x"], y=annot["y"], 
-                        text=annot["text"], 
+                        text=styled_text, 
                         showarrow=False, 
-                        font=dict(size=annot["size"], color=annot["color"]), 
+                        font=dict(
+                            size=annot["size"], 
+                            color=annot["color"],
+                            family=annot.get("font", "Arial")
+                        ), 
                         bgcolor="rgba(255, 255, 255, 0.5)"
                     )
 
