@@ -589,8 +589,6 @@ if datasets or batches:
                     with c_act:
                         render_file_actions(d, bid, batches)
     
-    st.sidebar.caption("⚠️ Refreshing the page will clear the data.")
-    
     st.sidebar.markdown("---")
     st.sidebar.markdown("""
 **Author :** Amir MEDDAS  
