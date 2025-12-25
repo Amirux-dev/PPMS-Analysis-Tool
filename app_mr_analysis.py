@@ -23,10 +23,11 @@ st.markdown("""
             padding-bottom: 1rem;
         }
         section[data-testid="stSidebar"] {
-            transition: width 1s ease;
+            transition: width 0.5s ease-in-out, min-width 0.5s ease-in-out;
         }
         section[data-testid="stSidebar"][aria-expanded="true"] {
-            width: 33vw;
+            width: 33vw !important;
+            min-width: 33vw !important;
         }
     </style>
 """, unsafe_allow_html=True)
