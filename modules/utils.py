@@ -38,7 +38,7 @@ def get_current_state_dict():
         'plot_states': plot_states
     }
 
-def save_session_state():
+def save_session_state(save_to_project=True):
     """Saves the current session state to a local pickle file AND active project if autosave is on."""
     state_to_save = get_current_state_dict()
     
@@ -50,16 +50,17 @@ def save_session_state():
         print(f"Error saving recovery state: {e}")
 
     # 2. Auto-save to Project File
-    active_project = st.session_state.get('active_project')
-    autosave = st.session_state.get('autosave_enabled', False)
-    
-    if active_project and autosave:
-        project_path = os.path.join(PROJECTS_DIR, active_project)
-        try:
-            with open(project_path, 'wb') as f:
-                pickle.dump(state_to_save, f)
-        except Exception as e:
-            print(f"Error auto-saving project: {e}")
+    if save_to_project:
+        active_project = st.session_state.get('active_project')
+        autosave = st.session_state.get('autosave_enabled', False)
+        
+        if active_project and autosave:
+            project_path = os.path.join(PROJECTS_DIR, active_project)
+            try:
+                with open(project_path, 'wb') as f:
+                    pickle.dump(state_to_save, f)
+            except Exception as e:
+                print(f"Error auto-saving project: {e}")
 
 def list_projects():
     """Returns list of .ppms files in projects directory."""
@@ -119,8 +120,8 @@ def apply_loaded_state(saved_state):
             for k, v in saved_state['plot_states'].items():
                 st.session_state[k] = v
         
-        # Force save to local disk immediately
-        save_session_state()
+        # Force save to local disk immediately (Recovery only, do not overwrite project file yet)
+        save_session_state(save_to_project=False)
         return True
     except Exception as e:
         st.error(f"Error applying state: {e}")
