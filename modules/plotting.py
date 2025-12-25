@@ -282,111 +282,6 @@ def create_plot_interface(plot_id: str, available_datasets: List[Dict[str, Any]]
                 with c1: custom_y_col = persistent_selectbox("Y Column", display_cols, index=default_y_idx, persistent_key=f"y_col_{plot_id}")
                 with c2: custom_x_col = persistent_selectbox("X Column", display_cols, index=default_x_idx, persistent_key=f"x_col_{plot_id}")
 
-        # --- TAB 2: ANALYSIS ---
-        with tab_analysis:
-            c_fit1, c_fit2, c_proc = st.columns(3)
-            with c_fit1: show_linear_fit = persistent_input(st.toggle, f"fit_{plot_id}", label="Linear Fit", value=False, help="Fit Y = aX + b")
-            with c_fit2: show_parabolic_fit = persistent_input(st.toggle, f"pfit_{plot_id}", label="Parabolic Fit", value=False, help="Fit Y = aX² + bX + c")
-            with c_proc:
-                if analysis_mode in ["Standard MR Analysis", "Standard R-H Analysis"]:
-                    with st.popover("🪞 Symmetrize", use_container_width=True):
-                        st.markdown("Select files to symmetrize:")
-                        sym_options = {d['id']: d['fileName'] for d in selected_datasets}
-                        sym_key = f"sym_files_{plot_id}"
-                        if 'persistent_values' not in st.session_state: st.session_state['persistent_values'] = {}
-                        saved_sym = st.session_state['persistent_values'].get(sym_key, [])
-                        valid_sym = [sid for sid in saved_sym if sid in sym_options]
-                        selected_sym_ids = st.multiselect("Files", options=list(sym_options.keys()), format_func=lambda x: sym_options[x], default=valid_sym, key=f"widget_sym_{plot_id}_{st.session_state.uploader_key}", label_visibility="collapsed")
-                        if st.session_state['persistent_values'].get(sym_key) != selected_sym_ids:
-                            st.session_state['persistent_values'][sym_key] = selected_sym_ids
-                            save_session_state()
-                        symmetrize_files = selected_sym_ids
-                    plot_derivative = False
-                elif analysis_mode == "Standard R-T Analysis":
-                    plot_derivative = False
-                else:
-                    plot_derivative = persistent_input(st.toggle, f"deriv_{plot_id}", label="Derivative", value=False, help="Plot dY/dX vs X")
-
-            if show_linear_fit or show_parabolic_fit:
-                st.markdown("###### Fit Settings")
-                if show_linear_fit:
-                    with st.expander("Linear Fit Configuration", expanded=True):
-                        fit_options = {d['id']: d['fileName'] for d in selected_datasets}
-                        fit_sel_key = f"fit_sel_{plot_id}"
-                        saved_fit_sel = st.session_state['persistent_values'].get(fit_sel_key, [])
-                        valid_fit_sel = [sid for sid in saved_fit_sel if sid in fit_options]
-                        selected_fit_ids = st.multiselect("Select Curves to Fit", options=list(fit_options.keys()), format_func=lambda x: fit_options[x], default=valid_fit_sel, key=f"widget_fit_sel_{plot_id}_{st.session_state.uploader_key}")
-                        
-                        if st.session_state['persistent_values'].get(fit_sel_key) != selected_fit_ids:
-                            st.session_state['persistent_values'][fit_sel_key] = selected_fit_ids
-                            save_session_state()
-                        
-                        c_fmin, c_fmax = st.columns(2)
-                        with c_fmin: fit_range_min = persistent_input(st.number_input, f"fmin_{plot_id}", label="Min X", value=None, placeholder="Start")
-                        with c_fmax: fit_range_max = persistent_input(st.number_input, f"fmax_{plot_id}", label="Max X", value=None, placeholder="End")
-                        
-                        for fid in selected_fit_ids:
-                            st.caption(f"Settings for: {fit_options[fid]}")
-                            c_fc, c_fs = st.columns(2)
-                            with c_fc: f_color = persistent_input(st.color_picker, f"fit_col_{plot_id}_{fid}", label="Line Color", value="#FF0000")
-                            
-                            c_ax, c_ay, c_btn = st.columns([1, 1, 1])
-                            with c_ax: f_annot_x = persistent_input(st.number_input, f"fit_ax_{plot_id}_{fid}", label="Annot X", value=None, placeholder="Auto")
-                            with c_ay: f_annot_y = persistent_input(st.number_input, f"fit_ay_{plot_id}_{fid}", label="Annot Y", value=None, placeholder="Auto")
-                            with c_btn:
-                                st.write("")
-                                st.write("")
-                                
-                                def paste_fit_callback(pid, fid):
-                                    lc = st.session_state.get(f"last_click_{pid}")
-                                    if lc:
-                                        if 'persistent_values' not in st.session_state: st.session_state['persistent_values'] = {}
-                                        st.session_state['persistent_values'][f"fit_ax_{pid}_{fid}"] = lc["x"]
-                                        st.session_state['persistent_values'][f"fit_ay_{pid}_{fid}"] = lc["y"]
-
-                                st.button("📍 Paste", key=f"paste_fit_{plot_id}_{fid}", help="Paste clicked coordinates", on_click=paste_fit_callback, args=(plot_id, fid))
-
-                            linear_fit_settings[fid] = {"color": f_color, "annot_x": f_annot_x, "annot_y": f_annot_y}
-                
-                if show_parabolic_fit:
-                    with st.expander("Parabolic Fit Configuration", expanded=True):
-                        fit_options = {d['id']: d['fileName'] for d in selected_datasets}
-                        pfit_sel_key = f"pfit_sel_{plot_id}"
-                        saved_pfit_sel = st.session_state['persistent_values'].get(pfit_sel_key, [])
-                        valid_pfit_sel = [sid for sid in saved_pfit_sel if sid in fit_options]
-                        selected_pfit_ids = st.multiselect("Select Curves to Fit", options=list(fit_options.keys()), format_func=lambda x: fit_options[x], default=valid_pfit_sel, key=f"widget_pfit_sel_{plot_id}_{st.session_state.uploader_key}")
-                        
-                        if st.session_state['persistent_values'].get(pfit_sel_key) != selected_pfit_ids:
-                            st.session_state['persistent_values'][pfit_sel_key] = selected_pfit_ids
-                            save_session_state()
-
-                        c_pmin, c_pmax = st.columns(2)
-                        with c_pmin: pfit_range_min = persistent_input(st.number_input, f"pfmin_{plot_id}", label="Min X", value=None, placeholder="Start")
-                        with c_pmax: pfit_range_max = persistent_input(st.number_input, f"pfmax_{plot_id}", label="Max X", value=None, placeholder="End")
-
-                        for fid in selected_pfit_ids:
-                            st.caption(f"Settings for: {fit_options[fid]}")
-                            c_fc, c_fs = st.columns(2)
-                            with c_fc: pf_color = persistent_input(st.color_picker, f"pfit_col_{plot_id}_{fid}", label="Line Color", value="#00FF00")
-                            
-                            c_ax, c_ay, c_btn = st.columns([1, 1, 1])
-                            with c_ax: pf_annot_x = persistent_input(st.number_input, f"pfit_ax_{plot_id}_{fid}", label="Annot X", value=None, placeholder="Auto")
-                            with c_ay: pf_annot_y = persistent_input(st.number_input, f"pfit_ay_{plot_id}_{fid}", label="Annot Y", value=None, placeholder="Auto")
-                            with c_btn:
-                                st.write("")
-                                st.write("")
-                                
-                                def paste_pfit_callback(pid, fid):
-                                    lc = st.session_state.get(f"last_click_{pid}")
-                                    if lc:
-                                        if 'persistent_values' not in st.session_state: st.session_state['persistent_values'] = {}
-                                        st.session_state['persistent_values'][f"pfit_ax_{pid}_{fid}"] = lc["x"]
-                                        st.session_state['persistent_values'][f"pfit_ay_{pid}_{fid}"] = lc["y"]
-
-                                st.button("📍 Paste", key=f"paste_pfit_{plot_id}_{fid}", help="Paste clicked coordinates", on_click=paste_pfit_callback, args=(plot_id, fid))
-
-                            parabolic_fit_settings[fid] = {"color": pf_color, "annot_x": pf_annot_x, "annot_y": pf_annot_y}
-
         # --- PRE-CALCULATE DATA RANGES FOR ANNOTATION SCALING ---
         global_x_min, global_x_max = float('inf'), float('-inf')
         global_y_min, global_y_max = float('inf'), float('-inf')
@@ -481,6 +376,111 @@ def create_plot_interface(plot_id: str, available_datasets: List[Dict[str, Any]]
         x_step = get_smart_step(global_x_min, global_x_max)
         y_step = get_smart_step(global_y_min, global_y_max)
 
+        # --- TAB 2: ANALYSIS ---
+        with tab_analysis:
+            c_fit1, c_fit2, c_proc = st.columns(3)
+            with c_fit1: show_linear_fit = persistent_input(st.toggle, f"fit_{plot_id}", label="Linear Fit", value=False, help="Fit Y = aX + b")
+            with c_fit2: show_parabolic_fit = persistent_input(st.toggle, f"pfit_{plot_id}", label="Parabolic Fit", value=False, help="Fit Y = aX² + bX + c")
+            with c_proc:
+                if analysis_mode in ["Standard MR Analysis", "Standard R-H Analysis"]:
+                    with st.popover("🪞 Symmetrize", use_container_width=True):
+                        st.markdown("Select files to symmetrize:")
+                        sym_options = {d['id']: d['fileName'] for d in selected_datasets}
+                        sym_key = f"sym_files_{plot_id}"
+                        if 'persistent_values' not in st.session_state: st.session_state['persistent_values'] = {}
+                        saved_sym = st.session_state['persistent_values'].get(sym_key, [])
+                        valid_sym = [sid for sid in saved_sym if sid in sym_options]
+                        selected_sym_ids = st.multiselect("Files", options=list(sym_options.keys()), format_func=lambda x: sym_options[x], default=valid_sym, key=f"widget_sym_{plot_id}_{st.session_state.uploader_key}", label_visibility="collapsed")
+                        if st.session_state['persistent_values'].get(sym_key) != selected_sym_ids:
+                            st.session_state['persistent_values'][sym_key] = selected_sym_ids
+                            save_session_state()
+                        symmetrize_files = selected_sym_ids
+                    plot_derivative = False
+                elif analysis_mode == "Standard R-T Analysis":
+                    plot_derivative = False
+                else:
+                    plot_derivative = persistent_input(st.toggle, f"deriv_{plot_id}", label="Derivative", value=False, help="Plot dY/dX vs X")
+
+            if show_linear_fit or show_parabolic_fit:
+                st.markdown("###### Fit Settings")
+                if show_linear_fit:
+                    with st.expander("Linear Fit Configuration", expanded=True):
+                        fit_options = {d['id']: d['fileName'] for d in selected_datasets}
+                        fit_sel_key = f"fit_sel_{plot_id}"
+                        saved_fit_sel = st.session_state['persistent_values'].get(fit_sel_key, [])
+                        valid_fit_sel = [sid for sid in saved_fit_sel if sid in fit_options]
+                        selected_fit_ids = st.multiselect("Select Curves to Fit", options=list(fit_options.keys()), format_func=lambda x: fit_options[x], default=valid_fit_sel, key=f"widget_fit_sel_{plot_id}_{st.session_state.uploader_key}")
+                        
+                        if st.session_state['persistent_values'].get(fit_sel_key) != selected_fit_ids:
+                            st.session_state['persistent_values'][fit_sel_key] = selected_fit_ids
+                            save_session_state()
+                        
+                        c_fmin, c_fmax = st.columns(2)
+                        with c_fmin: fit_range_min = persistent_input(st.number_input, f"fmin_{plot_id}", label="Min X", value=None, placeholder="Start", format=x_fmt, step=x_step)
+                        with c_fmax: fit_range_max = persistent_input(st.number_input, f"fmax_{plot_id}", label="Max X", value=None, placeholder="End", format=x_fmt, step=x_step)
+                        
+                        for fid in selected_fit_ids:
+                            st.caption(f"Settings for: {fit_options[fid]}")
+                            c_fc, c_fs = st.columns(2)
+                            with c_fc: f_color = persistent_input(st.color_picker, f"fit_col_{plot_id}_{fid}", label="Line Color", value="#FF0000")
+                            
+                            c_ax, c_ay, c_btn = st.columns([1, 1, 1])
+                            with c_ax: f_annot_x = persistent_input(st.number_input, f"fit_ax_{plot_id}_{fid}", label="Annot X", value=None, placeholder="Auto", format=x_fmt, step=x_step)
+                            with c_ay: f_annot_y = persistent_input(st.number_input, f"fit_ay_{plot_id}_{fid}", label="Annot Y", value=None, placeholder="Auto", format=y_fmt, step=y_step)
+                            with c_btn:
+                                st.write("")
+                                st.write("")
+                                
+                                def paste_fit_callback(pid, fid):
+                                    lc = st.session_state.get(f"last_click_{pid}")
+                                    if lc:
+                                        if 'persistent_values' not in st.session_state: st.session_state['persistent_values'] = {}
+                                        st.session_state['persistent_values'][f"fit_ax_{pid}_{fid}"] = lc["x"]
+                                        st.session_state['persistent_values'][f"fit_ay_{pid}_{fid}"] = lc["y"]
+
+                                st.button("📍 Paste", key=f"paste_fit_{plot_id}_{fid}", help="Paste clicked coordinates", on_click=paste_fit_callback, args=(plot_id, fid))
+
+                            linear_fit_settings[fid] = {"color": f_color, "annot_x": f_annot_x, "annot_y": f_annot_y}
+                
+                if show_parabolic_fit:
+                    with st.expander("Parabolic Fit Configuration", expanded=True):
+                        fit_options = {d['id']: d['fileName'] for d in selected_datasets}
+                        pfit_sel_key = f"pfit_sel_{plot_id}"
+                        saved_pfit_sel = st.session_state['persistent_values'].get(pfit_sel_key, [])
+                        valid_pfit_sel = [sid for sid in saved_pfit_sel if sid in fit_options]
+                        selected_pfit_ids = st.multiselect("Select Curves to Fit", options=list(fit_options.keys()), format_func=lambda x: fit_options[x], default=valid_pfit_sel, key=f"widget_pfit_sel_{plot_id}_{st.session_state.uploader_key}")
+                        
+                        if st.session_state['persistent_values'].get(pfit_sel_key) != selected_pfit_ids:
+                            st.session_state['persistent_values'][pfit_sel_key] = selected_pfit_ids
+                            save_session_state()
+
+                        c_pmin, c_pmax = st.columns(2)
+                        with c_pmin: pfit_range_min = persistent_input(st.number_input, f"pfmin_{plot_id}", label="Min X", value=None, placeholder="Start", format=x_fmt, step=x_step)
+                        with c_pmax: pfit_range_max = persistent_input(st.number_input, f"pfmax_{plot_id}", label="Max X", value=None, placeholder="End", format=x_fmt, step=x_step)
+
+                        for fid in selected_pfit_ids:
+                            st.caption(f"Settings for: {fit_options[fid]}")
+                            c_fc, c_fs = st.columns(2)
+                            with c_fc: pf_color = persistent_input(st.color_picker, f"pfit_col_{plot_id}_{fid}", label="Line Color", value="#00FF00")
+                            
+                            c_ax, c_ay, c_btn = st.columns([1, 1, 1])
+                            with c_ax: pf_annot_x = persistent_input(st.number_input, f"pfit_ax_{plot_id}_{fid}", label="Annot X", value=None, placeholder="Auto", format=x_fmt, step=x_step)
+                            with c_ay: pf_annot_y = persistent_input(st.number_input, f"pfit_ay_{plot_id}_{fid}", label="Annot Y", value=None, placeholder="Auto", format=y_fmt, step=y_step)
+                            with c_btn:
+                                st.write("")
+                                st.write("")
+                                
+                                def paste_pfit_callback(pid, fid):
+                                    lc = st.session_state.get(f"last_click_{pid}")
+                                    if lc:
+                                        if 'persistent_values' not in st.session_state: st.session_state['persistent_values'] = {}
+                                        st.session_state['persistent_values'][f"pfit_ax_{pid}_{fid}"] = lc["x"]
+                                        st.session_state['persistent_values'][f"pfit_ay_{pid}_{fid}"] = lc["y"]
+
+                                st.button("📍 Paste", key=f"paste_pfit_{plot_id}_{fid}", help="Paste clicked coordinates", on_click=paste_pfit_callback, args=(plot_id, fid))
+
+                            parabolic_fit_settings[fid] = {"color": pf_color, "annot_x": pf_annot_x, "annot_y": pf_annot_y}
+
         # --- TAB 3: STYLING ---
         with tab_style:
             st.markdown("###### Curve Styling")
@@ -531,8 +531,8 @@ def create_plot_interface(plot_id: str, available_datasets: List[Dict[str, Any]]
                     use_xlim = persistent_input(st.checkbox, f"use_xlim_{plot_id}", label="Set X Limits")
                     if use_xlim:
                         c_xmin, c_xmax = st.columns(2)
-                        with c_xmin: xlim_min = persistent_input(st.number_input, f"xlim_min_{plot_id}", label="Min", value=-9.0, format="%.2f")
-                        with c_xmax: xlim_max = persistent_input(st.number_input, f"xlim_max_{plot_id}", label="Max", value=9.0, format="%.2f")
+                        with c_xmin: xlim_min = persistent_input(st.number_input, f"xlim_min_{plot_id}", label="Min", value=-9.0, format=x_fmt, step=x_step)
+                        with c_xmax: xlim_max = persistent_input(st.number_input, f"xlim_max_{plot_id}", label="Max", value=9.0, format=x_fmt, step=x_step)
                     else: xlim_min, xlim_max = None, None
 
                 with col_cust5:
@@ -541,8 +541,8 @@ def create_plot_interface(plot_id: str, available_datasets: List[Dict[str, Any]]
                     use_ylim = persistent_input(st.checkbox, f"use_ylim_{plot_id}", label="Set Y Limits")
                     if use_ylim:
                         c_ymin, c_ymax = st.columns(2)
-                        with c_ymin: ylim_min = persistent_input(st.number_input, f"ylim_min_{plot_id}", label="Min", value=0.0, format="%.2e")
-                        with c_ymax: ylim_max = persistent_input(st.number_input, f"ylim_max_{plot_id}", label="Max", value=100.0, format="%.2e")
+                        with c_ymin: ylim_min = persistent_input(st.number_input, f"ylim_min_{plot_id}", label="Min", value=0.0, format=y_fmt, step=y_step)
+                        with c_ymax: ylim_max = persistent_input(st.number_input, f"ylim_max_{plot_id}", label="Max", value=100.0, format=y_fmt, step=y_step)
                     else: ylim_min, ylim_max = None, None
 
                 with col_cust6:
