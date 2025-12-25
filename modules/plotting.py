@@ -127,7 +127,7 @@ def duplicate_plot_callback(plot_id):
     # Copy state
     for key in list(st.session_state.keys()):
         # Exclude buttons and temporary states
-        if any(x in key for x in ["dup_", "add_btn_", "del_btn_", "ren_btn_"]): continue
+        if any(x in key for x in ["dup_", "add_btn_", "del_btn_", "ren_btn_", "paste_"]): continue
         
         new_key = None
         # Case 1: Key ends with _{plot_id} (Standard widgets)
@@ -631,7 +631,7 @@ def create_plot_interface(plot_id: str, available_datasets: List[Dict[str, Any]]
                         last_click = st.session_state.get(f"last_click_{plot_id}")
                         help_text = "1. Click a data point on the plot.\n2. Click this button to paste coordinates."
                         if last_click:
-                            st.caption(f"Sel: {last_click['x']:.2f}, {last_click['y']:.2f}")
+                            st.caption(f"Sel: {x_fmt % last_click['x']}, {y_fmt % last_click['y']}")
                         else:
                             st.caption("No point selected")
                         
