@@ -76,8 +76,6 @@ with st.sidebar.expander("⚙️ General Settings", expanded=False):
     global_field_unit = st.selectbox("Default Field Unit", ["Tesla (T)", "Oersted (Oe)"], index=0, key="global_field_unit")
     global_r0_method = st.selectbox("Default R0 Method", ["Closest to 0T", "Mean within Window", "First Point", "Max Resistance"], index=0, key="global_r0_method")
     
-    st.markdown("---")
-    st.caption(f"Session ID: `{st.session_state.get('session_id', 'Unknown')[:8]}...`")
     
     # Share Session UI
     with st.popover("🔗 Share Session", use_container_width=True):
