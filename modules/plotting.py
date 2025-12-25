@@ -671,12 +671,7 @@ def create_plot_interface(plot_id: str, available_datasets: List[Dict[str, Any]]
                     annot.setdefault("font", "Arial")
 
                     st.markdown(f"**Annotation {i+1}**")
-                    c1, c2 = st.columns([0.85, 0.15], vertical_alignment="bottom")
-                    with c1:
-                        annot["text"] = st.text_input(f"Text", value=annot["text"], key=f"annot_txt_{plot_id}_{i}")
-                    with c2:
-                        if st.button("🗑️", key=f"del_annot_{plot_id}_{i}"):
-                            to_delete.append(i)
+                    annot["text"] = st.text_input(f"Text", value=annot["text"], key=f"annot_txt_{plot_id}_{i}")
                     
                     c_xy1, c_xy2, c_btn = st.columns([1, 1, 1], vertical_alignment="bottom")
                     with c_xy1:
@@ -695,7 +690,7 @@ def create_plot_interface(plot_id: str, available_datasets: List[Dict[str, Any]]
                                   on_click=perform_paste, use_container_width=True,
                                   args=(plot_id, f"annot_x_{plot_id}_{i}", f"annot_y_{plot_id}_{i}", False))
 
-                    c_style_row = st.columns([1, 1, 2, 0.7, 0.7], vertical_alignment="bottom")
+                    c_style_row = st.columns([1, 1, 2, 0.6, 0.6, 0.5], vertical_alignment="bottom")
                     with c_style_row[0]:
                         annot["color"] = st.color_picker("Color", value=annot["color"], key=f"annot_col_{plot_id}_{i}")
                     with c_style_row[1]:
@@ -706,6 +701,9 @@ def create_plot_interface(plot_id: str, available_datasets: List[Dict[str, Any]]
                         annot["bold"] = st.checkbox("Bold", value=annot["bold"], key=f"annot_bold_{plot_id}_{i}")
                     with c_style_row[4]:
                         annot["italic"] = st.checkbox("Italic", value=annot["italic"], key=f"annot_italic_{plot_id}_{i}")
+                    with c_style_row[5]:
+                        if st.button("🗑️", key=f"del_annot_{plot_id}_{i}", help="Delete Annotation"):
+                            to_delete.append(i)
 
                     st.divider()
 
