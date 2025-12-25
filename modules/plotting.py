@@ -526,7 +526,6 @@ def create_plot_interface(plot_id: str, available_datasets: List[Dict[str, Any]]
                                     st.caption(f"Sel: {x_fmt % last_click['x']}, {y_fmt % last_click['y']}")
                                 else:
                                     st.caption("No point selected")
-                                
                                 st.button("📍 Paste", key=f"paste_fit_{plot_id}_{fid}", help="Paste clicked coordinates", 
                                           on_click=perform_paste, 
                                           args=(plot_id, f"fit_ax_{plot_id}_{fid}", f"fit_ay_{plot_id}_{fid}", True))
@@ -577,7 +576,6 @@ def create_plot_interface(plot_id: str, available_datasets: List[Dict[str, Any]]
                                     st.caption(f"Sel: {x_fmt % last_click['x']}, {y_fmt % last_click['y']}")
                                 else:
                                     st.caption("No point selected")
-                                
                                 st.button("📍 Paste", key=f"paste_pfit_{plot_id}_{fid}", help="Paste clicked coordinates", 
                                           on_click=perform_paste, 
                                           args=(plot_id, f"pfit_ax_{plot_id}_{fid}", f"pfit_ay_{plot_id}_{fid}", True))
@@ -871,12 +869,17 @@ def create_plot_interface(plot_id: str, available_datasets: List[Dict[str, Any]]
                         
                         annot_x_f = fit_cfg.get('annot_x')
                         annot_y_f = fit_cfg.get('annot_y')
-                        if annot_x_f is None or annot_y_f is None:
-                            mid_idx = len(xf) // 2
-                            annot_x_f, annot_y_f, ay_offset = xf.iloc[mid_idx], y_fit.iloc[mid_idx], -40
-                        else: ay_offset = -40
                         
-                        fig.add_annotation(x=annot_x_f, y=annot_y_f, text=f"<b>y = {slope:.3e} x + {intercept:.3e}</b>", showarrow=True, arrowhead=2, arrowsize=1, arrowwidth=2, arrowcolor=f_col, ax=0, ay=ay_offset, bgcolor="rgba(255, 255, 255, 0.8)", bordercolor=f_col, borderwidth=1, font=dict(size=14, color=f_col))
+                        # Calculate midpoint for arrow head
+                        mid_idx = len(xf) // 2
+                        arrow_x, arrow_y = xf.iloc[mid_idx], y_fit.iloc[mid_idx]
+                        
+                        if annot_x_f is None or annot_y_f is None:
+                            # Default: Text offset by -40px from midpoint
+                            fig.add_annotation(x=arrow_x, y=arrow_y, text=f"<b>y = {slope:.3e} x + {intercept:.3e}</b>", showarrow=True, arrowhead=2, arrowsize=1, arrowwidth=2, arrowcolor=f_col, ax=0, ay=-40, bgcolor="rgba(255, 255, 255, 0.8)", bordercolor=f_col, borderwidth=1, font=dict(size=14, color=f_col))
+                        else:
+                            # Custom: Text at specific coordinates, Arrow points to midpoint
+                            fig.add_annotation(x=arrow_x, y=arrow_y, text=f"<b>y = {slope:.3e} x + {intercept:.3e}</b>", showarrow=True, arrowhead=2, arrowsize=1, arrowwidth=2, arrowcolor=f_col, ax=annot_x_f, ay=annot_y_f, axref="x", ayref="y", bgcolor="rgba(255, 255, 255, 0.8)", bordercolor=f_col, borderwidth=1, font=dict(size=14, color=f_col))
 
                 # Parabolic Fit
                 if show_parabolic_fit and d['id'] in parabolic_fit_settings and x_data is not None and y_data is not None:
@@ -898,12 +901,17 @@ def create_plot_interface(plot_id: str, available_datasets: List[Dict[str, Any]]
                         
                         annot_x_pf = pfit_cfg.get('annot_x')
                         annot_y_pf = pfit_cfg.get('annot_y')
-                        if annot_x_pf is None or annot_y_pf is None:
-                            mid_idx = len(xpf) // 2
-                            annot_x_pf, annot_y_pf, ay_offset = xpf.iloc[mid_idx], y_pfit.iloc[mid_idx], 40
-                        else: ay_offset = -40
+                        
+                        # Calculate midpoint for arrow head
+                        mid_idx = len(xpf) // 2
+                        arrow_x, arrow_y = xpf.iloc[mid_idx], y_pfit.iloc[mid_idx]
 
-                        fig.add_annotation(x=annot_x_pf, y=annot_y_pf, text=f"<b>y = {a:.2e} x² + {b:.2e} x + {c:.2e}</b>", showarrow=True, arrowhead=2, arrowsize=1, arrowwidth=2, arrowcolor=pf_col, ax=0, ay=ay_offset, bgcolor="rgba(255, 255, 255, 0.8)", bordercolor=pf_col, borderwidth=1, font=dict(size=14, color=pf_col))
+                        if annot_x_pf is None or annot_y_pf is None:
+                            # Default: Text offset by 40px from midpoint
+                            fig.add_annotation(x=arrow_x, y=arrow_y, text=f"<b>y = {a:.2e} x² + {b:.2e} x + {c:.2e}</b>", showarrow=True, arrowhead=2, arrowsize=1, arrowwidth=2, arrowcolor=pf_col, ax=0, ay=40, bgcolor="rgba(255, 255, 255, 0.8)", bordercolor=pf_col, borderwidth=1, font=dict(size=14, color=pf_col))
+                        else:
+                            # Custom: Text at specific coordinates, Arrow points to midpoint
+                            fig.add_annotation(x=arrow_x, y=arrow_y, text=f"<b>y = {a:.2e} x² + {b:.2e} x + {c:.2e}</b>", showarrow=True, arrowhead=2, arrowsize=1, arrowwidth=2, arrowcolor=pf_col, ax=annot_x_pf, ay=annot_y_pf, axref="x", ayref="y", bgcolor="rgba(255, 255, 255, 0.8)", bordercolor=pf_col, borderwidth=1, font=dict(size=14, color=pf_col))
 
                 clean_label = d['label'].replace(" ", "_") + suffix.replace(" ", "_").replace("(", "").replace(")", "")
                 export_data[f"{clean_label}_X"] = x_data.values
