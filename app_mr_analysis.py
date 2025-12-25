@@ -84,6 +84,53 @@ with st.sidebar.expander("💾 Project Management", expanded=False):
     except Exception as e:
         st.error(f"Error preparing download: {e}")
         
+    # Export Data (ZIP)
+    if st.session_state.all_datasets:
+        st.markdown("---")
+        st.markdown("**Export Data**")
+        
+        # Prepare ZIP on the fly
+        zip_buffer = io.BytesIO()
+        with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zf:
+            # Reconstruct batches locally for export
+            exp_datasets = st.session_state.all_datasets
+            exp_batches = {}
+            
+            # 1. Collect existing batches
+            for d in exp_datasets:
+                bid = d.get('batch_id', 0)
+                bname = d.get('batch_name', f"Batch #{bid}") if bid != 0 else "File by file import"
+                if bid not in exp_batches: exp_batches[bid] = {'name': bname, 'files': []}
+                exp_batches[bid]['files'].append(d)
+            
+            # 2. Add empty custom batches
+            if 'custom_batches' in st.session_state:
+                for bid, bname in st.session_state.custom_batches.items():
+                    if bid not in exp_batches: exp_batches[bid] = {'name': bname, 'files': []}
+
+            for bid, info in exp_batches.items():
+                # Clean folder name
+                raw_name = info['name']
+                folder_name = "".join(c for c in raw_name if c.isalnum() or c in (' ', '_', '-')).strip()
+                if not folder_name: folder_name = f"Batch_{bid}"
+                
+                for d in info['files']:
+                    fname = d['fileName']
+                    content = d.get('original_content')
+                    if content is None:
+                        if 'full_df' in d: content = d['full_df'].to_csv(index=False)
+                        else: content = ""
+                    zf.writestr(f"{folder_name}/{fname}", content)
+        
+        st.download_button(
+            label="📥 Download All Data (.zip)",
+            data=zip_buffer.getvalue(),
+            file_name="all_data.zip",
+            mime="application/zip",
+            help="Download all loaded files organized by folder.",
+            use_container_width=True
+        )
+
     st.markdown("---")
     
     # Load Project
@@ -526,38 +573,6 @@ if datasets or batches:
     if st.sidebar.button("💾 Save Analysis State", help="Force save current state to disk", width='stretch'):
         save_session_state()
         st.toast("State saved manually!", icon="💾")
-
-    # Download All Data Button
-    if datasets:
-        zip_buffer = io.BytesIO()
-        with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zf:
-            for bid, info in batches.items():
-                # Clean folder name
-                raw_name = info['name']
-                # Remove emojis and special chars for filesystem safety
-                folder_name = "".join(c for c in raw_name if c.isalnum() or c in (' ', '_', '-')).strip()
-                if not folder_name: folder_name = f"Batch_{bid}"
-                
-                for d in info['files']:
-                    fname = d['fileName']
-                    content = d.get('original_content')
-                    
-                    if content is None:
-                        # Fallback: Reconstruct CSV from DataFrame if original content is missing
-                        if 'full_df' in d:
-                            content = d['full_df'].to_csv(index=False)
-                        else:
-                            content = ""
-                    
-                    zf.writestr(f"{folder_name}/{fname}", content)
-        
-        st.sidebar.download_button(
-            label="📥 Download All Data (.zip)",
-            data=zip_buffer.getvalue(),
-            file_name="all_data.zip",
-            mime="application/zip",
-            help="Download all loaded files organized by folder."
-        )
 
     # --- Batch Actions Button ---
     if dialog_decorator:
