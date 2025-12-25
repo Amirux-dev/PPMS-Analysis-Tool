@@ -1,8 +1,10 @@
 # PPMS Analysis Tool
 
-[![Streamlit](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://streamlit.io)
+[![Streamlit](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://ppms-analysis-tool.streamlit.app/)
 
 **[English](#english) | [Français](#français)**
+
+The application is available online at: **[https://ppms-analysis-tool.streamlit.app/](https://ppms-analysis-tool.streamlit.app/)**
 
 ---
 
@@ -70,6 +72,8 @@ It looks for patterns like `T=...K`, `...K`, `...T` (Tesla), or `...Oe`.
 
 <a name="français"></a>
 ## 🇫🇷 Français
+
+L'application est disponible en ligne à l'adresse : **[https://ppms-analysis-tool.streamlit.app/](https://ppms-analysis-tool.streamlit.app/)**
 
 ### Présentation
 **PPMS Analysis Tool** est une application web interactive développée avec Streamlit pour l'analyse rapide et la visualisation de données de transport électronique. Elle est spécifiquement conçue pour traiter les fichiers de données issus de mesures **PPMS (Physical Property Measurement System)**, comme les courbes de Magnétorésistance (MR) et de Résistance en fonction de la Température (R-T).
