@@ -577,7 +577,7 @@ if datasets or batches:
 *LPS - Laboratoire de Physique des Solides*                                              
 *C2N - Centre de Nanosciences et de Nanotechnologies*    
                         
-[![LinkedIn](https://img.shields.io/badge/LinkedIn-0077B5?style=for-the-badge&logo=linkedin&logoColor=white)](https://www.linkedin.com/in/amir-meddas-80876424b/)
+
 """)
 
 else:
@@ -588,7 +588,7 @@ else:
 *LPS - Laboratoire de Physique des Solides*                                                                
 *C2N - Centre de Nanosciences et de Nanotechnologies*  
                         
-[![LinkedIn](https://img.shields.io/badge/LinkedIn-0077B5?style=for-the-badge&logo=linkedin&logoColor=white)](https://www.linkedin.com/in/amir-meddas-80876424b/)
+
 """)
     st.stop()
 
