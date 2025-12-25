@@ -627,11 +627,21 @@ def create_plot_interface(plot_id: str, available_datasets: List[Dict[str, Any]]
                 marker_style = dict(size=marker_size)
                 if c_color: marker_style['color'] = c_color
 
+                # Determine mode and marker style
+                trace_mode = mode_map[plot_mode]
+                trace_marker = marker_style if "Markers" in plot_mode else None
+                
+                if plot_mode == "Lines":
+                    # Hack: Use lines+markers with invisible markers to allow point selection
+                    trace_mode = "lines+markers"
+                    trace_marker = dict(size=max(marker_size, 8), opacity=0)
+                    if c_color: trace_marker['color'] = c_color
+
                 fig.add_trace(go.Scatter(
-                    x=x_data, y=y_data, mode=mode_map[plot_mode], name=legend_name,
+                    x=x_data, y=y_data, mode=trace_mode, name=legend_name,
                     hovertemplate=f"{x_label}: %{{x:.4f}}<br>{y_label}: %{{y:.4e}}<extra></extra>",
                     line=line_style if "Lines" in plot_mode else None,
-                    marker=marker_style if "Markers" in plot_mode else None
+                    marker=trace_marker
                 ))
                 
                 # Linear Fit
