@@ -25,7 +25,6 @@ st.markdown("""
         section[data-testid="stSidebar"][aria-expanded="true"] {
             width: 33vw !important;
             min-width: 33vw !important;
-            transition: width 0.5s ease-in-out, min-width 0.5s ease-in-out;
         }
     </style>
 """, unsafe_allow_html=True)
