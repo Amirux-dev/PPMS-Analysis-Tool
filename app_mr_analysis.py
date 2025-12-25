@@ -61,18 +61,7 @@ with st.sidebar.expander("⚙️ General Settings", expanded=False):
 # --- Sidebar: Project Management ---
 with st.sidebar.expander("💾 Project Management", expanded=False):
     
-    # 1. Import Section
-    uploaded_projs = st.file_uploader("Import .ppms projects", type=["ppms"], accept_multiple_files=True, key=f"imp_proj_{st.session_state.get('proj_import_key',0)}", help="Add existing projects to your workspace.")
-    if uploaded_projs:
-        for up in uploaded_projs:
-            import_project_file(up.name, up.getvalue())
-        st.session_state.proj_import_key = st.session_state.get('proj_import_key', 0) + 1
-        st.toast(f"Imported {len(uploaded_projs)} projects!", icon="📥")
-        st.rerun()
-
-    st.markdown("---")
-
-    # 2. Project Selector
+    # 1. Project Selector
     projects = list_projects()
     active_proj = st.session_state.get('active_project')
     
