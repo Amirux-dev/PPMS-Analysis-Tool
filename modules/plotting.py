@@ -466,8 +466,20 @@ def create_plot_interface(plot_id: str, available_datasets: List[Dict[str, Any]]
             if val_range > 1000: return "%.2f"
             return "%.4f"
 
+        def get_smart_step(val_min, val_max):
+            val_range = abs(val_max - val_min)
+            if val_range == 0: return 0.1
+            if val_range < 1e-5: return 1e-7
+            if val_range < 1e-3: return 1e-5
+            if val_range < 1: return 0.001
+            if val_range < 10: return 0.01
+            if val_range < 100: return 0.1
+            return 1.0
+
         x_fmt = get_smart_format(global_x_min, global_x_max)
         y_fmt = get_smart_format(global_y_min, global_y_max)
+        x_step = get_smart_step(global_x_min, global_x_max)
+        y_step = get_smart_step(global_y_min, global_y_max)
 
         # --- TAB 3: STYLING ---
         with tab_style:
@@ -565,9 +577,9 @@ def create_plot_interface(plot_id: str, available_datasets: List[Dict[str, Any]]
                     
                     c_xy1, c_xy2, c_btn = st.columns([1, 1, 1], vertical_alignment="bottom")
                     with c_xy1:
-                        annot["x"] = st.number_input("X", value=float(annot["x"]), format=x_fmt, key=f"annot_x_{plot_id}_{i}")
+                        annot["x"] = st.number_input("X", value=float(annot["x"]), format=x_fmt, step=x_step, key=f"annot_x_{plot_id}_{i}")
                     with c_xy2:
-                        annot["y"] = st.number_input("Y", value=float(annot["y"]), format=y_fmt, key=f"annot_y_{plot_id}_{i}")
+                        annot["y"] = st.number_input("Y", value=float(annot["y"]), format=y_fmt, step=y_step, key=f"annot_y_{plot_id}_{i}")
                     with c_btn:
                         last_click = st.session_state.get(f"last_click_{plot_id}")
                         help_text = "1. Click a data point on the plot.\n2. Click this button to paste coordinates."
