@@ -13,7 +13,7 @@ from modules.utils import (
 from modules.plotting import create_plot_interface, get_batch_map
 
 # Set page config to wide mode by default
-st.set_page_config(layout="wide", page_title="PPMS Analysis Tool", page_icon="📈")
+st.set_page_config(layout="wide", page_title="PPMS Analysis Tool", page_icon="📈", initial_sidebar_state="expanded")
 
 # Reduce top whitespace and adjust sidebar width
 st.markdown("""
@@ -23,7 +23,7 @@ st.markdown("""
             padding-bottom: 1rem;
         }
         section[data-testid="stSidebar"] {
-            min-width: 33vw;
+            width: 33vw;
         }
     </style>
 """, unsafe_allow_html=True)
