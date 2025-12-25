@@ -3,6 +3,7 @@ import os
 import uuid
 import zipfile
 import io
+import re
 from typing import List, Dict, Any, Optional, Tuple
 
 # Import Modules
@@ -147,12 +148,18 @@ with st.sidebar.expander("💾 Project Management", expanded=False):
         with col_save:
             if st.button("Save", width='stretch'):
                 if new_proj_name:
-                    fname = new_proj_name if new_proj_name.endswith('.ppms') else f"{new_proj_name}.ppms"
-                    if save_current_project(fname):
-                        st.session_state.active_project = fname
-                        st.session_state.autosave_enabled = True
-                        st.toast(f"Project '{fname}' created!", icon="🎉")
-                        st.rerun()
+                    # Validation
+                    if not re.match(r'^[\w\-. ]+$', new_proj_name):
+                        st.error("Invalid characters.")
+                    else:
+                        fname = new_proj_name if new_proj_name.endswith('.ppms') else f"{new_proj_name}.ppms"
+                        if fname in projects:
+                            st.error("Project exists!")
+                        elif save_current_project(fname):
+                            st.session_state.active_project = fname
+                            st.session_state.autosave_enabled = True
+                            st.toast(f"Project '{fname}' created!", icon="🎉")
+                            st.rerun()
                 else:
                     st.error("Enter a name.")
 
@@ -160,47 +167,50 @@ with st.sidebar.expander("💾 Project Management", expanded=False):
     if st.session_state.all_datasets:
         st.markdown("**Export Data**")
         
-        # Prepare ZIP on the fly
-        zip_buffer = io.BytesIO()
-        with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zf:
-            # Reconstruct batches locally for export
-            exp_datasets = st.session_state.all_datasets
-            exp_batches = {}
-            
-            # 1. Collect existing batches
-            for d in exp_datasets:
-                bid = d.get('batch_id', 0)
-                bname = d.get('batch_name', f"Batch #{bid}") if bid != 0 else "File by file import"
-                if bid not in exp_batches: exp_batches[bid] = {'name': bname, 'files': []}
-                exp_batches[bid]['files'].append(d)
-            
-            # 2. Add empty custom batches
-            if 'custom_batches' in st.session_state:
-                for bid, bname in st.session_state.custom_batches.items():
-                    if bid not in exp_batches: exp_batches[bid] = {'name': bname, 'files': []}
-
-            for bid, info in exp_batches.items():
-                # Clean folder name
-                raw_name = info['name']
-                folder_name = "".join(c for c in raw_name if c.isalnum() or c in (' ', '_', '-')).strip()
-                if not folder_name: folder_name = f"Batch_{bid}"
+        try:
+            # Prepare ZIP on the fly
+            zip_buffer = io.BytesIO()
+            with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zf:
+                # Reconstruct batches locally for export
+                exp_datasets = st.session_state.all_datasets
+                exp_batches = {}
                 
-                for d in info['files']:
-                    fname = d['fileName']
-                    content = d.get('original_content')
-                    if content is None:
-                        if 'full_df' in d: content = d['full_df'].to_csv(index=False)
-                        else: content = ""
-                    zf.writestr(f"{folder_name}/{fname}", content)
-        
-        st.download_button(
-            label="📥 Download All Data (.zip)",
-            data=zip_buffer.getvalue(),
-            file_name="all_data.zip",
-            mime="application/zip",
-            help="Download all loaded files organized by folder.",
-            use_container_width=True
-        )
+                # 1. Collect existing batches
+                for d in exp_datasets:
+                    bid = d.get('batch_id', 0)
+                    bname = d.get('batch_name', f"Batch #{bid}") if bid != 0 else "File by file import"
+                    if bid not in exp_batches: exp_batches[bid] = {'name': bname, 'files': []}
+                    exp_batches[bid]['files'].append(d)
+                
+                # 2. Add empty custom batches
+                if 'custom_batches' in st.session_state:
+                    for bid, bname in st.session_state.custom_batches.items():
+                        if bid not in exp_batches: exp_batches[bid] = {'name': bname, 'files': []}
+
+                for bid, info in exp_batches.items():
+                    # Clean folder name
+                    raw_name = info['name']
+                    folder_name = "".join(c for c in raw_name if c.isalnum() or c in (' ', '_', '-')).strip()
+                    if not folder_name: folder_name = f"Batch_{bid}"
+                    
+                    for d in info['files']:
+                        fname = d['fileName']
+                        content = d.get('original_content')
+                        if content is None:
+                            if 'full_df' in d: content = d['full_df'].to_csv(index=False)
+                            else: content = ""
+                        zf.writestr(f"{folder_name}/{fname}", content)
+            
+            st.download_button(
+                label="📥 Download All Data (.zip)",
+                data=zip_buffer.getvalue(),
+                file_name="all_data.zip",
+                mime="application/zip",
+                help="Download all loaded files organized by folder.",
+                use_container_width=True
+            )
+        except Exception as e:
+            st.error(f"Error preparing export: {e}")
 
 
 
