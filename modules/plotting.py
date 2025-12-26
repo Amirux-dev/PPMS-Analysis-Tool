@@ -362,6 +362,7 @@ def create_plot_interface(plot_id: str, available_datasets: List[Dict[str, Any]]
                         st.markdown(f"**{d['fileName']}**")
                         st.markdown(f"- **Selected Resistance Column:** `{d.get('rCol', 'N/A')}`")
                         st.markdown(f"- **Selected Field Column:** `{d.get('fieldCol', 'N/A')}`")
+                        st.markdown(f"- **Selected Temperature Column:** `{d.get('tempCol', 'N/A')}`")
                         
                         if 'skipped_rows' in d and d['skipped_rows'] > 0:
                             st.warning(f"⚠️ {d['skipped_rows']} rows were skipped during parsing (non-numeric or infinite values).")
@@ -800,7 +801,13 @@ def create_plot_interface(plot_id: str, available_datasets: List[Dict[str, Any]]
                 r_col = d['rCol']
                 if r_col not in full_df.columns: continue
                 
-                df = pd.DataFrame({"T": full_df[temp_col], "R": full_df[r_col]}).dropna().sort_values("T")
+                df_raw = pd.DataFrame({"T": full_df[temp_col], "R": full_df[r_col]})
+                df = df_raw.dropna().sort_values("T")
+                
+                dropped = len(df_raw) - len(df)
+                if dropped > 0:
+                    st.warning(f"⚠️ {dropped} points dropped in {d['fileName']} due to missing T or R values.")
+                    
                 if df.empty: continue
                 
                 x_data, x_label = df["T"], "Temperature (K)"

@@ -219,7 +219,9 @@ def parse_multivu_content(content: str, filename: str) -> Dict[str, Any]:
         raise ValueError("No valid resistance column found.")
     resist_name = cols[resist_i]
 
-    temp_i = cols.index("Temperature (K)") if "Temperature (K)" in cols else -1
+    temp_i = choose_temperature_column(cols)
+    temp_col_name = cols[temp_i] if temp_i >= 0 else None
+    
     tvals: List[float] = []
 
     H_T: List[float] = []
@@ -294,6 +296,7 @@ def parse_multivu_content(content: str, filename: str) -> Dict[str, Any]:
         "direction": meta['direction'],
         "fieldCol": field_name,
         "rCol": resist_name,
+        "tempCol": temp_col_name,
         "H_T": H_T,
         "R": R,
         "full_df": df_full,
