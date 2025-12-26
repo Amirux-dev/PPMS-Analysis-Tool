@@ -250,17 +250,20 @@ def create_plot_interface(plot_id: str, available_datasets: List[Dict[str, Any]]
             current_selection = valid_selection
         
         combined_options = sorted(list(set(filtered_filenames + current_selection)))
-        widget_sel_key = f"sel_{plot_id}_{st.session_state.uploader_key}"
         
-        if widget_sel_key in st.session_state:
+        # Make key dynamic to force reset on batch change
+        widget_sel_key = f"sel_{plot_id}_{st.session_state.uploader_key}_{str(selected_batch_id)}"
+        
+        def update_selection():
             st.session_state[persistent_sel_key] = st.session_state[widget_sel_key]
+            save_session_state()
         
         # Fix for Streamlit warning: Only pass default if key is not in session_state
         ms_kwargs = {
             "label": f"Select Curves for {plot_name}",
             "options": combined_options,
             "key": widget_sel_key,
-            "on_change": save_session_state
+            "on_change": update_selection
         }
         if widget_sel_key not in st.session_state:
             ms_kwargs["default"] = current_selection
