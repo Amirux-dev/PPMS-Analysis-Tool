@@ -128,24 +128,44 @@ def choose_field_column(cols: List[str]) -> int:
     return -1
 
 def choose_temperature_column(cols: List[str]) -> int:
-    preferred = ["Temperature (K)", "Temp (K)", "T (K)"]
+    preferred = ["Temperature (K)", "Temp (K)", "T (K)", "Sample Temp (K)"]
     for p in preferred:
         if p in cols:
             return cols.index(p)
     
     hits = [(i, c) for i, c in enumerate(cols) if "temp" in c.lower()]
     if hits:
+        # Prefer columns with "Sample" or "(K)"
+        def score(item):
+            _, c = item
+            lc = c.lower()
+            s = 0
+            if "sample" in lc: s -= 10
+            if "(k)" in lc: s -= 5
+            return s
+        hits.sort(key=score)
         return hits[0][0]
     return -1
 
 def _resist_candidates(cols: List[str]) -> List[int]:
-    return [i for i, c in enumerate(cols) if "resist" in c.lower()]
+    return [i for i, c in enumerate(cols) if "resist" in c.lower() or "ohm" in c.lower()]
 
 def _resist_tiebreak_key(colname: str) -> Tuple[int, int]:
     lc = colname.lower()
-    # Prefer Resistance (0) over Resistivity (1) to match plot labels and avoid missing geometry data
-    kind = 0 if "resistance" in lc else (1 if "resistivity" in lc else 2)
-    bridge = 0 if "bridge 1" in lc else 1
+    # Priority 1: Prefer Resistance (0) over Resistivity (10) to avoid missing geometry data
+    # "Ohm" without resistivity is likely Resistance (1)
+    if "resistivity" in lc:
+        kind = 10
+    elif "resistance" in lc:
+        kind = 0
+    elif "ohm" in lc:
+        kind = 1
+    else:
+        kind = 5
+        
+    # Priority 2: Prefer Bridge 1, then Bridge 2, etc.
+    bridge = 0 if "bridge 1" in lc else (1 if "bridge 2" in lc else 2)
+    
     return (kind, bridge)
 
 def choose_best_resistance_column(cols: List[str], rows: List[List[str]], max_rows: int = 4000) -> int:
