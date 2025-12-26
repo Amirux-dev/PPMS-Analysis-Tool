@@ -143,7 +143,8 @@ def _resist_candidates(cols: List[str]) -> List[int]:
 
 def _resist_tiebreak_key(colname: str) -> Tuple[int, int]:
     lc = colname.lower()
-    kind = 0 if "resistivity" in lc else (1 if "resistance" in lc else 2)
+    # Prefer Resistance (0) over Resistivity (1) to match plot labels and avoid missing geometry data
+    kind = 0 if "resistance" in lc else (1 if "resistivity" in lc else 2)
     bridge = 0 if "bridge 1" in lc else 1
     return (kind, bridge)
 
@@ -226,6 +227,7 @@ def parse_multivu_content(content: str, filename: str) -> Dict[str, Any]:
     
     # Store full data for custom plotting
     full_data_rows = []
+    skipped_count = 0
 
     for row in rows:
         if not row:
@@ -250,9 +252,11 @@ def parse_multivu_content(content: str, filename: str) -> Dict[str, Any]:
             h = float(row[field_i])
             r = float(row[resist_i])
         except Exception:
+            skipped_count += 1
             continue
 
         if not (math.isfinite(h) and math.isfinite(r)):
+            skipped_count += 1
             continue
 
         H_T.append(field_to_tesla(h, field_name))
@@ -293,5 +297,6 @@ def parse_multivu_content(content: str, filename: str) -> Dict[str, Any]:
         "H_T": H_T,
         "R": R,
         "full_df": df_full,
-        "metadata": meta
+        "metadata": meta,
+        "skipped_rows": skipped_count
     }
