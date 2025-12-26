@@ -355,26 +355,6 @@ def create_plot_interface(plot_id: str, available_datasets: List[Dict[str, Any]]
                     with c1: custom_y_col = persistent_selectbox("Y Column", display_cols, index=default_y_idx, persistent_key=f"y_col_{plot_id}")
                     with c2: custom_x_col = persistent_selectbox("X Column", display_cols, index=default_x_idx, persistent_key=f"x_col_{plot_id}")
 
-            # --- Debug / Raw Data View ---
-            with st.expander("🔍 Inspect Raw Data", expanded=False):
-                if selected_datasets:
-                    for d in selected_datasets:
-                        st.markdown(f"**{d['fileName']}**")
-                        st.markdown(f"- **Selected Resistance Column:** `{d.get('rCol', 'N/A')}`")
-                        st.markdown(f"- **Selected Field Column:** `{d.get('fieldCol', 'N/A')}`")
-                        st.markdown(f"- **Selected Temperature Column:** `{d.get('tempCol', 'N/A')}`")
-                        
-                        if 'skipped_rows' in d and d['skipped_rows'] > 0:
-                            st.warning(f"⚠️ {d['skipped_rows']} rows were skipped during parsing (non-numeric or infinite values).")
-                        
-                        if 'full_df' in d:
-                            st.dataframe(d['full_df'].head(20))
-                            st.caption("Showing first 20 rows of parsed data.")
-                        else:
-                            st.warning("Full dataframe not available.")
-                else:
-                    st.info("Select a file to inspect.")
-
         # --- PRE-CALCULATE DATA RANGES FOR ANNOTATION SCALING ---
         global_x_min, global_x_max = float('inf'), float('-inf')
         global_y_min, global_y_max = float('inf'), float('-inf')
@@ -801,13 +781,7 @@ def create_plot_interface(plot_id: str, available_datasets: List[Dict[str, Any]]
                 r_col = d['rCol']
                 if r_col not in full_df.columns: continue
                 
-                df_raw = pd.DataFrame({"T": full_df[temp_col], "R": full_df[r_col]})
-                df = df_raw.dropna().sort_values("T")
-                
-                dropped = len(df_raw) - len(df)
-                if dropped > 0:
-                    st.warning(f"⚠️ {dropped} points dropped in {d['fileName']} due to missing T or R values.")
-                    
+                df = pd.DataFrame({"T": full_df[temp_col], "R": full_df[r_col]}).dropna().sort_values("T")
                 if df.empty: continue
                 
                 x_data, x_label = df["T"], "Temperature (K)"
