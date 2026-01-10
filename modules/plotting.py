@@ -376,41 +376,49 @@ def create_plot_interface(plot_id: str, available_datasets: List[Dict[str, Any]]
         
         with col_actions:
             if not is_collapsed:
-                # Custom CSS for styled emoji buttons
-                st.markdown("""
+                # Custom CSS for colored emoji buttons
+                st.markdown(f"""
                 <style>
-                .emoji-btn {
-                    display: inline-flex;
-                    align-items: center;
-                    justify-content: center;
-                    width: 100%;
-                    height: 38px;
-                    border-radius: 4px;
-                    border: none;
-                    cursor: pointer;
-                    font-size: 18px;
-                    transition: all 0.2s;
-                }
-                .emoji-btn:hover {
-                    transform: translateY(-2px);
-                    box-shadow: 0 4px 8px rgba(0,0,0,0.2);
-                }
-                .btn-edit { background: #4A90E2; }
-                .btn-up { background: #50C878; }
-                .btn-down { background: #F39C12; }
-                .btn-add { background: #9B59B6; }
-                .btn-dup { background: #3498DB; }
-                .btn-del { background: #E74C3C; }
+                /* Rename button - Blue */
+                button[kind="primary"][data-testid*="baseButton-primary"]:has(*):nth-of-type(1) {{
+                    background-color: #4A90E2 !important;
+                }}
+                /* Up button - Green */
+                div[data-testid="column"] button[key*="up_btn_{plot_id}"],
+                button[kind="secondary"]:has(*):nth-of-type(2) {{
+                    background-color: #50C878 !important;
+                    color: white !important;
+                }}
+                /* Down button - Orange */
+                button[kind="secondary"]:has(*):nth-of-type(3) {{
+                    background-color: #F39C12 !important;
+                    color: white !important;
+                }}
+                /* Add button - Purple */
+                button[kind="secondary"]:has(*):nth-of-type(4) {{
+                    background-color: #9B59B6 !important;
+                    color: white !important;
+                }}
+                /* Duplicate button - Light Blue */
+                button[kind="secondary"]:has(*):nth-of-type(5) {{
+                    background-color: #3498DB !important;
+                    color: white !important;
+                }}
+                /* Delete button - Red */
+                button[kind="secondary"]:has(*):nth-of-type(6) {{
+                    background-color: #E74C3C !important;
+                    color: white !important;
+                }}
                 </style>
                 """, unsafe_allow_html=True)
                 
                 a1, a2, a3, a4, a5, a6 = st.columns(6, gap="small")
-                with a1: st.button("✏️", key=f"ren_btn_{plot_id}", help="Rename", on_click=toggle_rename_callback, args=(plot_id,), use_container_width=True)
-                with a2: st.button("⬆️", key=f"up_btn_{plot_id}", help="Move Up", on_click=move_plot_callback, args=(plot_id, -1), use_container_width=True)
-                with a3: st.button("⬇️", key=f"down_btn_{plot_id}", help="Move Down", on_click=move_plot_callback, args=(plot_id, 1), use_container_width=True)
-                with a4: st.button("➕", key=f"add_btn_{plot_id}", help="Add Plot", on_click=add_plot_callback, use_container_width=True)
-                with a5: st.button("📋", key=f"dup_{plot_id}", help="Duplicate", on_click=duplicate_plot_callback, args=(plot_id,), use_container_width=True)
-                with a6: st.button("🗑️", key=f"del_btn_{plot_id}", help="Delete", on_click=remove_plot_callback, args=(plot_id,), use_container_width=True)
+                with a1: st.button("✏️", key=f"ren_btn_{plot_id}", help="Rename", on_click=toggle_rename_callback, args=(plot_id,), type="primary", use_container_width=True)
+                with a2: st.button("⬆️", key=f"up_btn_{plot_id}", help="Move Up", on_click=move_plot_callback, args=(plot_id, -1), type="secondary", use_container_width=True)
+                with a3: st.button("⬇️", key=f"down_btn_{plot_id}", help="Move Down", on_click=move_plot_callback, args=(plot_id, 1), type="secondary", use_container_width=True)
+                with a4: st.button("➕", key=f"add_btn_{plot_id}", help="Add Plot", on_click=add_plot_callback, type="secondary", use_container_width=True)
+                with a5: st.button("📋", key=f"dup_{plot_id}", help="Duplicate", on_click=duplicate_plot_callback, args=(plot_id,), type="secondary", use_container_width=True)
+                with a6: st.button("🗑️", key=f"del_btn_{plot_id}", help="Delete", on_click=remove_plot_callback, args=(plot_id,), type="secondary", use_container_width=True)
         
         # --- Content (Fragmented) ---
         # Wrapped in a container to ensure visual continuity within the bordered parent

@@ -34,25 +34,6 @@ st.markdown("""
             width: 33vw !important;
             min-width: 33vw !important;
         }
-        
-        /* Custom styling for emoji buttons */
-        .stButton > button {
-            padding: 0.25rem 0.5rem;
-            font-size: 1.2rem;
-            line-height: 1.4;
-            height: 38px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-        
-        /* Color coding for action buttons */
-        div[data-testid="column"]:has(button[kind="primary"]) button {
-            background-color: #FF4B4B;
-        }
-        div[data-testid="column"]:has(button[kind="secondary"]) button {
-            background-color: #262730;
-        }
     </style>
 """, unsafe_allow_html=True)
 
