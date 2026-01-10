@@ -860,7 +860,7 @@ if not plot_indices:
 
 # --- Quick Navigation Bar ---
 if len(plot_indices) > 1:
-    nav_col1, nav_col2 = st.columns([4, 1])
+    nav_col1, nav_col2 = st.columns([4, 1], vertical_alignment="bottom")
     with nav_col1:
         # Gather plot names
         nav_options = []
@@ -880,7 +880,7 @@ if len(plot_indices) > 1:
         )
     
     with nav_col2:
-        if st.button("🎯 Go", use_container_width=True, type="primary"):
+        if st.button("Go", use_container_width=True, type="primary"):
             if selected_nav_idx is not None:
                 target_id = nav_options[selected_nav_idx][0]
                 # Use HTML component with JavaScript for actual scrolling
