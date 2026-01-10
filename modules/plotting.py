@@ -376,43 +376,37 @@ def create_plot_interface(plot_id: str, available_datasets: List[Dict[str, Any]]
         
         with col_actions:
             if not is_collapsed:
-                # Custom CSS for colored emoji buttons
+                a1, a2, a3, a4, a5, a6 = st.columns(6, gap="small")
+                
+                # Inject CSS for each button individually using unique identifiers
                 st.markdown(f"""
                 <style>
-                /* Rename button - Blue */
-                button[kind="primary"][data-testid*="baseButton-primary"]:has(*):nth-of-type(1) {{
-                    background-color: #4A90E2 !important;
-                }}
-                /* Up button - Green */
-                div[data-testid="column"] button[key*="up_btn_{plot_id}"],
-                button[kind="secondary"]:has(*):nth-of-type(2) {{
+                button[data-testid="baseButton-secondary"]:has(p:contains("⬆️")) {{
                     background-color: #50C878 !important;
                     color: white !important;
                 }}
-                /* Down button - Orange */
-                button[kind="secondary"]:has(*):nth-of-type(3) {{
+                button[data-testid="baseButton-secondary"]:has(p:contains("⬇️")) {{
                     background-color: #F39C12 !important;
                     color: white !important;
                 }}
-                /* Add button - Purple */
-                button[kind="secondary"]:has(*):nth-of-type(4) {{
+                button[data-testid="baseButton-secondary"]:has(p:contains("➕")) {{
                     background-color: #9B59B6 !important;
                     color: white !important;
                 }}
-                /* Duplicate button - Light Blue */
-                button[kind="secondary"]:has(*):nth-of-type(5) {{
+                button[data-testid="baseButton-secondary"]:has(p:contains("📋")) {{
                     background-color: #3498DB !important;
                     color: white !important;
                 }}
-                /* Delete button - Red */
-                button[kind="secondary"]:has(*):nth-of-type(6) {{
+                button[data-testid="baseButton-secondary"]:has(p:contains("🗑️")) {{
                     background-color: #E74C3C !important;
                     color: white !important;
+                }}
+                button[data-testid="baseButton-primary"]:has(p:contains("✏️")) {{
+                    background-color: #4A90E2 !important;
                 }}
                 </style>
                 """, unsafe_allow_html=True)
                 
-                a1, a2, a3, a4, a5, a6 = st.columns(6, gap="small")
                 with a1: st.button("✏️", key=f"ren_btn_{plot_id}", help="Rename", on_click=toggle_rename_callback, args=(plot_id,), type="primary", use_container_width=True)
                 with a2: st.button("⬆️", key=f"up_btn_{plot_id}", help="Move Up", on_click=move_plot_callback, args=(plot_id, -1), type="secondary", use_container_width=True)
                 with a3: st.button("⬇️", key=f"down_btn_{plot_id}", help="Move Down", on_click=move_plot_callback, args=(plot_id, 1), type="secondary", use_container_width=True)
