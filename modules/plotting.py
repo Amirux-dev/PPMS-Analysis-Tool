@@ -836,191 +836,190 @@ with tab_style:
                 st.rerun()
 
 # --- TAB 4: EXPORT ---
-with tab_export: st.markdown("###### Export Data")
+    with tab_export: st.markdown("###### Export Data")
 
-# --- FINAL PLOTTING ---
-if not processed_entries:
-    st.info("Select at least one file to display the plot.")
-    return None
+    # --- FINAL PLOTTING ---
+    if not processed_entries:
+        st.info("Select at least one file to display the plot.")
+        return None
     
-fig = go.Figure()
-export_df_dict = {}
+    fig = go.Figure()
+    export_df_dict = {}
 
-# 1. Plot Curves
-for entry in processed_entries:
-    x_data, y_data = entry["x"], entry["y"]
-    d_id = entry["id"]
-    
-    c_settings = curve_settings.get(d_id, {})
-    c_color = c_settings.get("color")
-    c_smooth = c_settings.get("smoothing", 0)
-    
-    if c_smooth > 1: y_data = y_data.rolling(window=int(c_smooth), center=True).mean()
-    
-    base_legend = custom_legends.get(d_id, entry["name"])
-    legend_name = f"{base_legend}{entry['suffix']}"
-    
-    # Style Determination
-    line_style = dict(width=line_width, dash='dash' if entry['suffix'] else None)
-    if c_color: line_style['color'] = c_color
-    
-    marker_style = dict(size=marker_size)
-    if c_color: marker_style['color'] = c_color
-    
-    trace_mode = "lines" if plot_mode == "Lines" else "markers" if plot_mode == "Markers" else "lines+markers"
-    
-    if plot_mode == "Lines":
-        trace_mode = "lines+markers" # Hybrid for selection
-        marker_style = dict(size=max(marker_size, 8), opacity=0)
+    # 1. Plot Curves
+    for entry in processed_entries:
+        x_data, y_data = entry["x"], entry["y"]
+        d_id = entry["id"]
+        
+        c_settings = curve_settings.get(d_id, {})
+        c_color = c_settings.get("color")
+        c_smooth = c_settings.get("smoothing", 0)
+        
+        if c_smooth > 1: y_data = y_data.rolling(window=int(c_smooth), center=True).mean()
+        
+        base_legend = custom_legends.get(d_id, entry["name"])
+        legend_name = f"{base_legend}{entry['suffix']}"
+        
+        # Style Determination
+        line_style = dict(width=line_width, dash='dash' if entry['suffix'] else None)
+        if c_color: line_style['color'] = c_color
+        
+        marker_style = dict(size=marker_size)
         if c_color: marker_style['color'] = c_color
-
-    # Use valid WEBGL Scattergl
-    fig.add_trace(go.Scattergl(
-        x=x_data, y=y_data, mode=trace_mode, name=legend_name,
-        hovertemplate=f"{entry['lx']}: %{{x:.4f}}<br>{entry['ly']}: %{{y:.4e}}<extra></extra>",
-        line=line_style if "Lines" in plot_mode else None,
-        marker=marker_style if "Markers" in plot_mode or plot_mode == "Lines" else None
-    ))
-    
-    # Fits
-    if show_linear_fit and d_id in linear_fit_settings:
-        cfg = linear_fit_settings[d_id]
-        mask = x_data.notna() & y_data.notna()
-        if fit_range_min is not None: mask &= (x_data >= fit_range_min)
-        if fit_range_max is not None: mask &= (x_data <= fit_range_max)
-        xf, yf = x_data[mask], y_data[mask]
         
-        if len(xf) > 1:
-            slope, intercept = np.polyfit(xf, yf, 1)
-            y_fit = slope * xf + intercept
-            fig.add_trace(go.Scattergl(x=xf, y=y_fit, mode='lines', name=f"Linear: {legend_name}", 
-                                     line=dict(dash=cfg['style'], width=cfg['width'], color=cfg['color']), hoverinfo='skip'))
-
-            # Annotations
-            annot_x_f = cfg.get('annot_x')
-            annot_y_f = cfg.get('annot_y')
-            mid_idx = len(xf) // 2
-            arrow_x, arrow_y = xf.iloc[mid_idx], y_fit.iloc[mid_idx]
-
-            if annot_x_f is None or annot_y_f is None:
-                fig.add_annotation(x=arrow_x, y=arrow_y, text=f"<b>y = {slope:.3e} x + {intercept:.3e}</b>", 
-                                   showarrow=True, arrowhead=2, arrowsize=1, arrowwidth=2, arrowcolor=cfg['color'], 
-                                   ax=0, ay=-40, bgcolor="rgba(255, 255, 255, 0.8)", bordercolor=cfg['color'], borderwidth=1, 
-                                   font=dict(size=14, color=cfg['color']))
-            else:
-                fig.add_annotation(x=arrow_x, y=arrow_y, text=f"<b>y = {slope:.3e} x + {intercept:.3e}</b>", 
-                                   showarrow=True, arrowhead=2, arrowsize=1, arrowwidth=2, arrowcolor=cfg['color'], 
-                                   ax=annot_x_f, ay=annot_y_f, axref="x", ayref="y", 
-                                   bgcolor="rgba(255, 255, 255, 0.8)", bordercolor=cfg['color'], borderwidth=1, 
-                                   font=dict(size=14, color=cfg['color']))
-            
-    if show_parabolic_fit and d_id in parabolic_fit_settings:
-        cfg = parabolic_fit_settings[d_id]
-        mask = x_data.notna() & y_data.notna()
-        if pfit_range_min is not None: mask &= (x_data >= pfit_range_min)
-        if pfit_range_max is not None: mask &= (x_data <= pfit_range_max)
-        xf, yf = x_data[mask], y_data[mask]
+        trace_mode = "lines" if plot_mode == "Lines" else "markers" if plot_mode == "Markers" else "lines+markers"
         
-        if len(xf) > 2:
-            a, b, c = np.polyfit(xf, yf, 2)
-            y_fit = a * xf**2 + b * xf + c
-            fig.add_trace(go.Scattergl(x=xf, y=y_fit, mode='lines', name=f"Parabolic: {legend_name}",
-                                     line=dict(dash=cfg['style'], width=cfg['width'], color=cfg['color']), hoverinfo='skip'))
+        if plot_mode == "Lines":
+            trace_mode = "lines+markers" # Hybrid for selection
+            marker_style = dict(size=max(marker_size, 8), opacity=0)
+            if c_color: marker_style['color'] = c_color
 
-            # Annotations
-            annot_x_pf = cfg.get('annot_x')
-            annot_y_pf = cfg.get('annot_y')
-            mid_idx = len(xf) // 2
-            arrow_x, arrow_y = xf.iloc[mid_idx], y_fit.iloc[mid_idx]
-
-            if annot_x_pf is None or annot_y_pf is None:
-                fig.add_annotation(x=arrow_x, y=arrow_y, text=f"<b>y = {a:.2e} x² + {b:.2e} x + {c:.2e}</b>", 
-                                   showarrow=True, arrowhead=2, arrowsize=1, arrowwidth=2, arrowcolor=cfg['color'], 
-                                   ax=0, ay=40, bgcolor="rgba(255, 255, 255, 0.8)", bordercolor=cfg['color'], borderwidth=1, 
-                                   font=dict(size=14, color=cfg['color']))
-            else:
-                fig.add_annotation(x=arrow_x, y=arrow_y, text=f"<b>y = {a:.2e} x² + {b:.2e} x + {c:.2e}</b>", 
-                                   showarrow=True, arrowhead=2, arrowsize=1, arrowwidth=2, arrowcolor=cfg['color'], 
-                                   ax=annot_x_pf, ay=annot_y_pf, axref="x", ayref="y", 
-                                   bgcolor="rgba(255, 255, 255, 0.8)", bordercolor=cfg['color'], borderwidth=1, 
-                                   font=dict(size=14, color=cfg['color']))
-
-    # Prepare Export
-    clean_label = legend_name.replace(" ", "_").replace("(", "").replace(")", "")
-    export_df_dict[f"{clean_label}_X"] = x_data.values
-    export_df_dict[f"{clean_label}_Y"] = y_data.values
-
-# Layout Updates
-final_title = custom_title if custom_title else f"{processed_entries[0]['ly']} vs {processed_entries[0]['lx']}"
-final_xlabel = custom_xlabel if custom_xlabel else processed_entries[0]['lx']
-final_ylabel = custom_ylabel if custom_ylabel else processed_entries[0]['ly']
-
-final_template = template_mode if template_mode != "Auto (Global)" else "plotly"
-
-# Add Text Annotations
-if f"annotations_list_{plot_id}" in st.session_state:
-    for annot in st.session_state[f"annotations_list_{plot_id}"]:
-        if annot["text"]:
-            styled_text = annot["text"]
-            if annot.get("bold", False): styled_text = f"<b>{styled_text}</b>"
-            if annot.get("italic", False): styled_text = f"<i>{styled_text}</i>"
+        # Use valid WEBGL Scattergl
+        fig.add_trace(go.Scattergl(
+            x=x_data, y=y_data, mode=trace_mode, name=legend_name,
+            hovertemplate=f"{entry['lx']}: %{{x:.4f}}<br>{entry['ly']}: %{{y:.4e}}<extra></extra>",
+            line=line_style if "Lines" in plot_mode else None,
+            marker=marker_style if "Markers" in plot_mode or plot_mode == "Lines" else None
+        ))
+        
+        # Fits
+        if show_linear_fit and d_id in linear_fit_settings:
+            cfg = linear_fit_settings[d_id]
+            mask = x_data.notna() & y_data.notna()
+            if fit_range_min is not None: mask &= (x_data >= fit_range_min)
+            if fit_range_max is not None: mask &= (x_data <= fit_range_max)
+            xf, yf = x_data[mask], y_data[mask]
             
-            fig.add_annotation(
-                x=annot["x"], y=annot["y"], text=styled_text, showarrow=False, 
-                font=dict(size=annot["size"], color=annot["color"], family=annot.get("font", "Arial")), 
-                bgcolor="rgba(255, 255, 255, 0.5)"
+            if len(xf) > 1:
+                slope, intercept = np.polyfit(xf, yf, 1)
+                y_fit = slope * xf + intercept
+                fig.add_trace(go.Scattergl(x=xf, y=y_fit, mode='lines', name=f"Linear: {legend_name}", 
+                                         line=dict(dash=cfg['style'], width=cfg['width'], color=cfg['color']), hoverinfo='skip'))
+
+                # Annotations
+                annot_x_f = cfg.get('annot_x')
+                annot_y_f = cfg.get('annot_y')
+                mid_idx = len(xf) // 2
+                arrow_x, arrow_y = xf.iloc[mid_idx], y_fit.iloc[mid_idx]
+
+                if annot_x_f is None or annot_y_f is None:
+                    fig.add_annotation(x=arrow_x, y=arrow_y, text=f"<b>y = {slope:.3e} x + {intercept:.3e}</b>", 
+                                       showarrow=True, arrowhead=2, arrowsize=1, arrowwidth=2, arrowcolor=cfg['color'], 
+                                       ax=0, ay=-40, bgcolor="rgba(255, 255, 255, 0.8)", bordercolor=cfg['color'], borderwidth=1, 
+                                       font=dict(size=14, color=cfg['color']))
+                else:
+                    fig.add_annotation(x=arrow_x, y=arrow_y, text=f"<b>y = {slope:.3e} x + {intercept:.3e}</b>", 
+                                       showarrow=True, arrowhead=2, arrowsize=1, arrowwidth=2, arrowcolor=cfg['color'], 
+                                       ax=annot_x_f, ay=annot_y_f, axref="x", ayref="y", 
+                                       bgcolor="rgba(255, 255, 255, 0.8)", bordercolor=cfg['color'], borderwidth=1, 
+                                       font=dict(size=14, color=cfg['color']))
+                
+        if show_parabolic_fit and d_id in parabolic_fit_settings:
+            cfg = parabolic_fit_settings[d_id]
+            mask = x_data.notna() & y_data.notna()
+            if pfit_range_min is not None: mask &= (x_data >= pfit_range_min)
+            if pfit_range_max is not None: mask &= (x_data <= pfit_range_max)
+            xf, yf = x_data[mask], y_data[mask]
+            
+            if len(xf) > 2:
+                a, b, c = np.polyfit(xf, yf, 2)
+                y_fit = a * xf**2 + b * xf + c
+                fig.add_trace(go.Scattergl(x=xf, y=y_fit, mode='lines', name=f"Parabolic: {legend_name}",
+                                         line=dict(dash=cfg['style'], width=cfg['width'], color=cfg['color']), hoverinfo='skip'))
+
+                # Annotations
+                annot_x_pf = cfg.get('annot_x')
+                annot_y_pf = cfg.get('annot_y')
+                mid_idx = len(xf) // 2
+                arrow_x, arrow_y = xf.iloc[mid_idx], y_fit.iloc[mid_idx]
+
+                if annot_x_pf is None or annot_y_pf is None:
+                    fig.add_annotation(x=arrow_x, y=arrow_y, text=f"<b>y = {a:.2e} x² + {b:.2e} x + {c:.2e}</b>", 
+                                       showarrow=True, arrowhead=2, arrowsize=1, arrowwidth=2, arrowcolor=cfg['color'], 
+                                       ax=0, ay=40, bgcolor="rgba(255, 255, 255, 0.8)", bordercolor=cfg['color'], borderwidth=1, 
+                                       font=dict(size=14, color=cfg['color']))
+                else:
+                    fig.add_annotation(x=arrow_x, y=arrow_y, text=f"<b>y = {a:.2e} x² + {b:.2e} x + {c:.2e}</b>", 
+                                       showarrow=True, arrowhead=2, arrowsize=1, arrowwidth=2, arrowcolor=cfg['color'], 
+                                       ax=annot_x_pf, ay=annot_y_pf, axref="x", ayref="y", 
+                                       bgcolor="rgba(255, 255, 255, 0.8)", bordercolor=cfg['color'], borderwidth=1, 
+                                       font=dict(size=14, color=cfg['color']))
+
+        # Prepare Export
+        clean_label = legend_name.replace(" ", "_").replace("(", "").replace(")", "")
+        export_df_dict[f"{clean_label}_X"] = x_data.values
+        export_df_dict[f"{clean_label}_Y"] = y_data.values
+    # Layout Updates
+    final_title = custom_title if custom_title else f"{processed_entries[0]['ly']} vs {processed_entries[0]['lx']}"
+    final_xlabel = custom_xlabel if custom_xlabel else processed_entries[0]['lx']
+    final_ylabel = custom_ylabel if custom_ylabel else processed_entries[0]['ly']
+
+    final_template = template_mode if template_mode != "Auto (Global)" else "plotly"
+
+    # Add Text Annotations
+    if f"annotations_list_{plot_id}" in st.session_state:
+        for annot in st.session_state[f"annotations_list_{plot_id}"]:
+            if annot["text"]:
+                styled_text = annot["text"]
+                if annot.get("bold", False): styled_text = f"<b>{styled_text}</b>"
+                if annot.get("italic", False): styled_text = f"<i>{styled_text}</i>"
+                
+                fig.add_annotation(
+                    x=annot["x"], y=annot["y"], text=styled_text, showarrow=False, 
+                    font=dict(size=annot["size"], color=annot["color"], family=annot.get("font", "Arial")), 
+                    bgcolor="rgba(255, 255, 255, 0.5)"
+                )
+
+    fig.update_layout(
+        title=dict(text=final_title, font=dict(size=title_font_size), x=0.5, xanchor='center'),
+        xaxis=dict(title=dict(text=final_xlabel, font=dict(size=axis_title_size)), tickfont=dict(size=tick_font_size), 
+                   showgrid=show_grid, gridcolor=grid_color, range=[xlim_min, xlim_max] if use_xlim else None),
+        yaxis=dict(title=dict(text=final_ylabel, font=dict(size=axis_title_size)), tickfont=dict(size=tick_font_size), 
+                   showgrid=show_grid, gridcolor=grid_color, range=[ylim_min, ylim_max] if use_ylim else None),
+        showlegend=show_legend, hovermode="closest", height=height, width=width, template=final_template
+    )
+
+    # 4. Handle Selection/Click Events
+    selection = st.plotly_chart(fig, use_container_width=True, key=f"chart_{plot_id}", on_select="rerun", selection_mode="points")
+    if selection and selection.get("selection") and selection["selection"]["points"]:
+        point = selection["selection"]["points"][0]
+        st.session_state[f"last_click_{plot_id}"] = {"x": point["x"], "y": point["y"]}
+
+    # Export Buttons
+    if export_df_dict:
+        with tab_export:
+            export_msg_placeholder = st.empty() # Placeholder for cleanliness
+            
+            df_exp = pd.DataFrame(dict([ (k,pd.Series(v)) for k,v in export_df_dict.items() ]))
+            
+            # DAT Export
+            dat_exp = df_exp.to_csv(index=False, sep='\t').encode('utf-8')
+            st.download_button(
+                label="Download Data (.dat)",
+                data=dat_exp,
+                file_name=f"plot_{plot_id}_data.dat",
+                mime="text/plain",
+                key=f"dl_dat_optimized_{plot_id}"
             )
 
-fig.update_layout(
-    title=dict(text=final_title, font=dict(size=title_font_size), x=0.5, xanchor='center'),
-    xaxis=dict(title=dict(text=final_xlabel, font=dict(size=axis_title_size)), tickfont=dict(size=tick_font_size), 
-               showgrid=show_grid, gridcolor=grid_color, range=[xlim_min, xlim_max] if use_xlim else None),
-    yaxis=dict(title=dict(text=final_ylabel, font=dict(size=axis_title_size)), tickfont=dict(size=tick_font_size), 
-               showgrid=show_grid, gridcolor=grid_color, range=[ylim_min, ylim_max] if use_ylim else None),
-    showlegend=show_legend, hovermode="closest", height=height, width=width, template=final_template
-)
-
-# 4. Handle Selection/Click Events
-selection = st.plotly_chart(fig, use_container_width=True, key=f"chart_{plot_id}", on_select="rerun", selection_mode="points")
-if selection and selection.get("selection") and selection["selection"]["points"]:
-    point = selection["selection"]["points"][0]
-    st.session_state[f"last_click_{plot_id}"] = {"x": point["x"], "y": point["y"]}
-
-# Export Buttons
-if export_df_dict:
-    with tab_export:
-        export_msg_placeholder = st.empty() # Placeholder for cleanliness
-        
-        df_exp = pd.DataFrame(dict([ (k,pd.Series(v)) for k,v in export_df_dict.items() ]))
-        
-        # DAT Export
-        dat_exp = df_exp.to_csv(index=False, sep='\t').encode('utf-8')
-        st.download_button(
-            label="Download Data (.dat)",
-            data=dat_exp,
-            file_name=f"plot_{plot_id}_data.dat",
-            mime="text/plain",
-            key=f"dl_dat_optimized_{plot_id}"
-        )
-
-        # CSV Export
-        csv_exp = df_exp.to_csv(index=False, sep=',').encode('utf-8')
-        st.download_button(
-            label="Download Data (.csv)", 
-            data=csv_exp, 
-            file_name=f"plot_{plot_id}_data.csv", 
-            mime="text/csv", 
-            key=f"dl_csv_optimized_{plot_id}"
-        )
-        
-        # HTML Export
-        html_exp = fig.to_html(include_plotlyjs="cdn", full_html=True)
-        st.download_button(
-            label="Download Interactive Plot (.html)",
-            data=html_exp,
-            file_name=f"plot_{plot_id}.html",
-            mime="text/html",
-            key=f"dl_html_optimized_{plot_id}"
-        )
-        
-return fig
+            # CSV Export
+            csv_exp = df_exp.to_csv(index=False, sep=',').encode('utf-8')
+            st.download_button(
+                label="Download Data (.csv)", 
+                data=csv_exp, 
+                file_name=f"plot_{plot_id}_data.csv", 
+                mime="text/csv", 
+                key=f"dl_csv_optimized_{plot_id}"
+            )
+            
+            # HTML Export
+            html_exp = fig.to_html(include_plotlyjs="cdn", full_html=True)
+            st.download_button(
+                label="Download Interactive Plot (.html)",
+                data=html_exp,
+                file_name=f"plot_{plot_id}.html",
+                mime="text/html",
+                key=f"dl_html_optimized_{plot_id}"
+            )
+            
+    return fig
