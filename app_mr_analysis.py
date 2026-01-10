@@ -883,15 +883,22 @@ if len(plot_indices) > 1:
         if st.button("Go", use_container_width=True, type="primary"):
             if selected_nav_idx is not None:
                 target_id = nav_options[selected_nav_idx][0]
-                # Use HTML component with JavaScript for actual scrolling
-                components.html(f"""
-                    <script>
-                        const element = window.parent.document.getElementById('plot_{target_id}');
-                        if (element) {{
-                            element.scrollIntoView({{ behavior: 'smooth', block: 'center' }});
-                        }}
-                    </script>
-                """, height=0)
+                st.session_state['scroll_to'] = target_id
+                st.rerun()
+    
+    # Execute scroll if needed
+    if 'scroll_to' in st.session_state:
+        target_id = st.session_state.pop('scroll_to')
+        components.html(f"""
+            <script>
+                setTimeout(function() {{
+                    const element = window.parent.document.getElementById('plot_{target_id}');
+                    if (element) {{
+                        element.scrollIntoView({{ behavior: 'smooth', block: 'center' }});
+                    }}
+                }}, 300);
+            </script>
+        """, height=0)
     
     st.divider()
 
