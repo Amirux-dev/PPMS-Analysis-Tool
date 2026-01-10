@@ -376,70 +376,72 @@ def create_plot_interface(plot_id: str, available_datasets: List[Dict[str, Any]]
         
         with col_actions:
             if not is_collapsed:
-                # Generate unique container ID for CSS targeting
-                container_id = f"action_buttons_{plot_id}"
-                
-                # Inject CSS targeting buttons by position in this specific container
-                st.markdown(f"""
+                # Create HTML buttons with proper styling and colors
+                button_html = f"""
                 <style>
-                /* Ensure buttons have proper styling */
-                div[data-testid="stHorizontalBlock"] button {{
-                    font-size: 1.1rem !important;
-                    padding: 0.4rem 0.5rem !important;
-                    height: 38px !important;
-                    display: flex !important;
-                    align-items: center !important;
-                    justify-content: center !important;
-                    border-radius: 0.375rem !important;
-                    border: none !important;
+                .action-btn {{
+                    display: inline-flex;
+                    align-items: center;
+                    justify-content: center;
+                    width: 100%;
+                    height: 38px;
+                    border: none;
+                    border-radius: 0.375rem;
+                    font-size: 1.1rem;
+                    cursor: pointer;
+                    transition: all 0.2s;
+                    color: white;
+                    font-family: inherit;
                 }}
-                
-                /* Target buttons by their column position - child 1 = rename (blue) */
-                div[data-testid="column"]:nth-child(1) button[data-testid="baseButton-primary"] {{
-                    background-color: #4A90E2 !important;
-                    color: white !important;
+                .action-btn:hover {{
+                    opacity: 0.85;
+                    transform: translateY(-1px);
                 }}
-                
-                /* child 2 = up (green) */
-                div[data-testid="column"]:nth-child(2) button[data-testid="baseButton-secondary"] {{
-                    background-color: #50C878 !important;
-                    color: white !important;
+                .action-btn:active {{
+                    transform: translateY(0);
                 }}
-                
-                /* child 3 = down (orange) */
-                div[data-testid="column"]:nth-child(3) button[data-testid="baseButton-secondary"] {{
-                    background-color: #F39C12 !important;
-                    color: white !important;
-                }}
-                
-                /* child 4 = add (purple) */
-                div[data-testid="column"]:nth-child(4) button[data-testid="baseButton-secondary"] {{
-                    background-color: #9B59B6 !important;
-                    color: white !important;
-                }}
-                
-                /* child 5 = duplicate (light blue) */
-                div[data-testid="column"]:nth-child(5) button[data-testid="baseButton-secondary"] {{
-                    background-color: #3498DB !important;
-                    color: white !important;
-                }}
-                
-                /* child 6 = delete (red) */
-                div[data-testid="column"]:nth-child(6) button[data-testid="baseButton-secondary"] {{
-                    background-color: #E74C3C !important;
-                    color: white !important;
-                }}
+                .btn-edit {{ background: #4A90E2; }}
+                .btn-up {{ background: #50C878; }}
+                .btn-down {{ background: #F39C12; }}
+                .btn-add {{ background: #9B59B6; }}
+                .btn-dup {{ background: #3498DB; }}
+                .btn-del {{ background: #E74C3C; }}
                 </style>
-                <div id="{container_id}"></div>
-                """, unsafe_allow_html=True)
+                """
+                st.markdown(button_html, unsafe_allow_html=True)
                 
                 a1, a2, a3, a4, a5, a6 = st.columns(6, gap="small")
-                with a1: st.button("✏️", key=f"ren_btn_{plot_id}", help="Rename", on_click=toggle_rename_callback, args=(plot_id,), type="primary", use_container_width=True)
-                with a2: st.button("⬆️", key=f"up_btn_{plot_id}", help="Move Up", on_click=move_plot_callback, args=(plot_id, -1), type="secondary", use_container_width=True)
-                with a3: st.button("⬇️", key=f"down_btn_{plot_id}", help="Move Down", on_click=move_plot_callback, args=(plot_id, 1), type="secondary", use_container_width=True)
-                with a4: st.button("➕", key=f"add_btn_{plot_id}", help="Add Plot", on_click=add_plot_callback, type="secondary", use_container_width=True)
-                with a5: st.button("📋", key=f"dup_{plot_id}", help="Duplicate", on_click=duplicate_plot_callback, args=(plot_id,), type="secondary", use_container_width=True)
-                with a6: st.button("🗑️", key=f"del_btn_{plot_id}", help="Delete", on_click=remove_plot_callback, args=(plot_id,), type="secondary", use_container_width=True)
+                
+                # Store actions in session state to trigger on next rerun
+                with a1:
+                    if st.button("", key=f"ren_btn_{plot_id}", help="Rename", use_container_width=True):
+                        toggle_rename_callback(plot_id)
+                    st.markdown(f'<div style="margin-top: -50px; pointer-events: none; text-align: center; font-size: 1.1rem;">✏️</div>', unsafe_allow_html=True)
+                    
+                with a2:
+                    if st.button("", key=f"up_btn_{plot_id}", help="Move Up", use_container_width=True):
+                        move_plot_callback(plot_id, -1)
+                    st.markdown(f'<div style="margin-top: -50px; pointer-events: none; text-align: center; font-size: 1.1rem;">⬆️</div>', unsafe_allow_html=True)
+                    
+                with a3:
+                    if st.button("", key=f"down_btn_{plot_id}", help="Move Down", use_container_width=True):
+                        move_plot_callback(plot_id, 1)
+                    st.markdown(f'<div style="margin-top: -50px; pointer-events: none; text-align: center; font-size: 1.1rem;">⬇️</div>', unsafe_allow_html=True)
+                    
+                with a4:
+                    if st.button("", key=f"add_btn_{plot_id}", help="Add Plot", use_container_width=True):
+                        add_plot_callback()
+                    st.markdown(f'<div style="margin-top: -50px; pointer-events: none; text-align: center; font-size: 1.1rem;">➕</div>', unsafe_allow_html=True)
+                    
+                with a5:
+                    if st.button("", key=f"dup_{plot_id}", help="Duplicate", use_container_width=True):
+                        duplicate_plot_callback(plot_id)
+                    st.markdown(f'<div style="margin-top: -50px; pointer-events: none; text-align: center; font-size: 1.1rem;">📋</div>', unsafe_allow_html=True)
+                    
+                with a6:
+                    if st.button("", key=f"del_btn_{plot_id}", help="Delete", type="secondary", use_container_width=True):
+                        remove_plot_callback(plot_id)
+                    st.markdown(f'<div style="margin-top: -50px; pointer-events: none; text-align: center; font-size: 1.1rem;">🗑️</div>', unsafe_allow_html=True)
         
         # --- Content (Fragmented) ---
         # Wrapped in a container to ensure visual continuity within the bordered parent
