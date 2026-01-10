@@ -857,6 +857,32 @@ if not plot_indices:
         add_plot_callback()
         st.rerun()
 
+# --- Quick Navigation Bar ---
+if len(plot_indices) > 1:
+    col_nav_1, col_nav_2 = st.columns([3, 1], vertical_alignment="bottom")
+    with col_nav_1:
+         # Gather plot names
+        nav_options = []
+        for pid in plot_indices:
+            p_key = f"pname_{pid}"
+            if 'persistent_values' in st.session_state and p_key in st.session_state['persistent_values']:
+                p_name = st.session_state['persistent_values'][p_key]
+            else:
+                p_name = st.session_state.get(p_key, f"Plot {pid}")
+            nav_options.append((pid, p_name))
+            
+        selected_nav_idx = st.selectbox(
+            "📍 Jump to Plot", 
+            options=range(len(nav_options)), 
+            format_func=lambda i: nav_options[i][1],
+            key="nav_plot_selector",
+            label_visibility="visible"
+        )
+    with col_nav_2:
+        if selected_nav_idx is not None:
+             target_id = nav_options[selected_nav_idx][0]
+             st.link_button("Go ➡️", url=f"#plot_{target_id}", help=f"Scroll to {nav_options[selected_nav_idx][1]}", use_container_width=True)
+
 # Create rows
 rows = [plot_indices[i:i + num_cols] for i in range(0, len(plot_indices), num_cols)]
 
