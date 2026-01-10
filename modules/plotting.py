@@ -531,7 +531,7 @@ def create_plot_interface(plot_id: str, available_datasets: List[Dict[str, Any]]
                     df_curr, analysis_mode, x_axis_unit, y_axis_mode, 
                     r0_method, r0_window, custom_x_col, custom_y_col, 
                     plot_derivative,
-                    temp_col_idx=choose_temperature_column(df_curr.columns),
+                    temp_col_idx=choose_temperature_column(df_curr.columns.tolist()),
                     r_col_name=d.get('rCol', 'R')
                 )
                 
