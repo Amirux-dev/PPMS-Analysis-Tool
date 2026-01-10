@@ -700,6 +700,49 @@ def create_plot_interface(plot_id: str, available_datasets: List[Dict[str, Any]]
                     show_grid = persistent_input(st.checkbox, f"grid_{plot_id}", label="Show Grid", value=True)
                     grid_color = persistent_input(st.color_picker, f"grid_color_{plot_id}", label="Grid Color", value="#E5E5E5")
 
+            with st.expander("**Text Annotation**", expanded=False):
+                if f"annotations_list_{plot_id}" not in st.session_state:
+                    st.session_state[f"annotations_list_{plot_id}"] = []
+
+                if st.button("Add Annotation", key=f"add_annot_btn_{plot_id}"):
+                    st.session_state[f"annotations_list_{plot_id}"].append({
+                        "text": "New Text", "x": global_x_min, "y": global_y_min, "color": "#000000", "size": 14,
+                        "bold": False, "italic": False, "font": "Arial"
+                    })
+                    st.rerun()
+
+                to_delete = []
+                for i, annot in enumerate(st.session_state[f"annotations_list_{plot_id}"]):
+                    annot.setdefault("bold", False)
+                    annot.setdefault("italic", False)
+                    annot.setdefault("font", "Arial")
+
+                    st.markdown(f"**Annotation {i+1}**")
+                    annot["text"] = st.text_input(f"Text", value=annot["text"], key=f"annot_txt_{plot_id}_{i}")
+                    
+                    c_xy1, c_xy2, c_btn = st.columns([1, 1, 1], vertical_alignment="bottom")
+                    with c_xy1: annot["x"] = st.number_input("X", value=float(annot["x"]), format=x_fmt, step=x_step, key=f"annot_x_{plot_id}_{i}")
+                    with c_xy2: annot["y"] = st.number_input("Y", value=float(annot["y"]), format=y_fmt, step=y_step, key=f"annot_y_{plot_id}_{i}")
+                    with c_btn:
+                        last_click = st.session_state.get(f"last_click_{plot_id}")
+                        sel_str = f"{x_fmt % last_click['x']}, {y_fmt % last_click['y']}" if last_click else "No point"
+                        st.markdown(f"<div style='font-size: 13px; margin-bottom: 0.5rem;'>Sel: {sel_str}</div>", unsafe_allow_html=True)
+                        st.button("📍 Paste", key=f"paste_click_{plot_id}_{i}", on_click=perform_paste, use_container_width=True, args=(plot_id, f"annot_x_{plot_id}_{i}", f"annot_y_{plot_id}_{i}", False))
+
+                    c_style_row = st.columns([1, 1, 2, 0.6, 0.6, 0.5], vertical_alignment="bottom")
+                    with c_style_row[0]: annot["color"] = st.color_picker("Color", value=annot["color"], key=f"annot_col_{plot_id}_{i}")
+                    with c_style_row[1]: annot["size"] = st.number_input("Size", value=int(annot["size"]), min_value=5, key=f"annot_sz_{plot_id}_{i}")
+                    with c_style_row[2]: annot["font"] = st.selectbox("Font", ["Arial", "Times New Roman", "Courier New", "Verdana", "Georgia"], index=0 if annot["font"] == "Arial" else 1, key=f"annot_font_{plot_id}_{i}")
+                    with c_style_row[3]: annot["bold"] = st.checkbox("B", value=annot["bold"], key=f"annot_bold_{plot_id}_{i}")
+                    with c_style_row[4]: annot["italic"] = st.checkbox("I", value=annot["italic"], key=f"annot_italic_{plot_id}_{i}")
+                    with c_style_row[5]:
+                        if st.button("🗑️", key=f"del_annot_{plot_id}_{i}", help="Delete Annotation"): to_delete.append(i)
+                    st.divider()
+
+                if to_delete:
+                    for index in sorted(to_delete, reverse=True): del st.session_state[f"annotations_list_{plot_id}"][index]
+                    st.rerun()
+
     # --- TAB 4: EXPORT ---
     with tab_export: st.markdown("###### Export Data")
 
@@ -785,6 +828,20 @@ def create_plot_interface(plot_id: str, available_datasets: List[Dict[str, Any]]
     final_ylabel = custom_ylabel if custom_ylabel else processed_entries[0]['ly']
     
     final_template = template_mode if template_mode != "Auto (Global)" else "plotly"
+
+    # Add Text Annotations
+    if f"annotations_list_{plot_id}" in st.session_state:
+        for annot in st.session_state[f"annotations_list_{plot_id}"]:
+            if annot["text"]:
+                styled_text = annot["text"]
+                if annot.get("bold", False): styled_text = f"<b>{styled_text}</b>"
+                if annot.get("italic", False): styled_text = f"<i>{styled_text}</i>"
+                
+                fig.add_annotation(
+                    x=annot["x"], y=annot["y"], text=styled_text, showarrow=False, 
+                    font=dict(size=annot["size"], color=annot["color"], family=annot.get("font", "Arial")), 
+                    bgcolor="rgba(255, 255, 255, 0.5)"
+                )
     
     fig.update_layout(
         title=dict(text=final_title, font=dict(size=title_font_size), x=0.5, xanchor='center'),
@@ -801,7 +858,7 @@ def create_plot_interface(plot_id: str, available_datasets: List[Dict[str, Any]]
     if export_df_dict:
         with tab_export:
             df_exp = pd.DataFrame(dict([ (k,pd.Series(v)) for k,v in export_df_dict.items() ]))
-            st.download_button(label="Download CSV", data=df_exp.to_csv(index=False).encode('utf-8'), file_name="plot_data.csv", mime="text/csv")
+            st.download_button(label="Download CSV", data=df_exp.to_csv(index=False).encode('utf-8'), file_name="plot_data.csv", mime="text/csv", key=f"dl_csv_optimized_{plot_id}")
             
     return fig
 
