@@ -345,26 +345,23 @@ def create_plot_interface(plot_id: str, available_datasets: List[Dict[str, Any]]
     """Creates a self-contained plotting interface and returns the figure. Wrapper to handle toolbar separately."""
     
     with st.container(border=True):
-        # Anchor for navigation (invisible)
-        st.markdown(f"<div id='plot_{plot_id}'></div>", unsafe_allow_html=True)
+        # Anchor for navigation
+        st.markdown(f"<div id='plot_{plot_id}' style='position: relative; top: -70px;'></div>", unsafe_allow_html=True)
         
-        # --- Header Row (Non-Fragmented) ---
-        # Collapse State
+        # --- Collapse State ---
         p_col_key = f"is_collapsed_{plot_id}"
-        # Sync with persistent values if present
         if 'persistent_values' in st.session_state and p_col_key in st.session_state['persistent_values']:
             st.session_state[p_col_key] = st.session_state['persistent_values'][p_col_key]
-             
         is_collapsed = st.session_state.get(p_col_key, False)
         
-        # Title row with collapse button
-        c_col, c_title = st.columns([0.5, 11.5], vertical_alignment="center", gap="small")
+        # --- Header: Title + Collapse ---
+        col_collapse, col_title, col_actions = st.columns([0.4, 8, 3.6], vertical_alignment="center")
         
-        with c_col:
-            icon = "▶️" if is_collapsed else "🔽"
-            st.button(icon, key=f"col_btn_{plot_id}", help="Replier/Déplier", on_click=toggle_collapse_callback, args=(plot_id,), use_container_width=True)
+        with col_collapse:
+            icon = "▶" if is_collapsed else "▼"
+            st.button(icon, key=f"col_btn_{plot_id}", help="Expand/Collapse", on_click=toggle_collapse_callback, args=(plot_id,), use_container_width=True)
 
-        with c_title:
+        with col_title:
             p_key = f"pname_{plot_id}"
             if 'persistent_values' in st.session_state and p_key in st.session_state['persistent_values']:
                 plot_name = st.session_state['persistent_values'][p_key]
@@ -375,17 +372,17 @@ def create_plot_interface(plot_id: str, available_datasets: List[Dict[str, Any]]
                 if p_key not in st.session_state: st.session_state[p_key] = plot_name
                 st.text_input("Name", value=plot_name, key=p_key, label_visibility="collapsed", on_change=close_rename_callback, args=(plot_id,))
             else:
-                st.markdown(f"<h3 style='margin: 0; padding: 0; line-height: 1.5;'>{plot_name}</h3>", unsafe_allow_html=True)
+                st.markdown(f"**{plot_name}**")
         
-        # Action buttons row (only if not collapsed)
-        if not is_collapsed:
-            btn_cols = st.columns([1, 1, 1, 1, 1, 1, 6], gap="small")
-            with btn_cols[0]: st.button("✏️ Renommer", key=f"ren_btn_{plot_id}", help="Renommer le graphique", on_click=toggle_rename_callback, args=(plot_id,), use_container_width=True)
-            with btn_cols[1]: st.button("⬆️ Monter", key=f"up_btn_{plot_id}", help="Déplacer vers le haut", on_click=move_plot_callback, args=(plot_id, -1), use_container_width=True)
-            with btn_cols[2]: st.button("⬇️ Descendre", key=f"down_btn_{plot_id}", help="Déplacer vers le bas", on_click=move_plot_callback, args=(plot_id, 1), use_container_width=True)
-            with btn_cols[3]: st.button("➕ Ajouter", key=f"add_btn_{plot_id}", help="Ajouter un nouveau graphique", on_click=add_plot_callback, use_container_width=True)
-            with btn_cols[4]: st.button("📋 Dupliquer", key=f"dup_{plot_id}", help="Dupliquer ce graphique", on_click=duplicate_plot_callback, args=(plot_id,), use_container_width=True)
-            with btn_cols[5]: st.button("🗑️ Supprimer", key=f"del_btn_{plot_id}", help="Supprimer ce graphique", on_click=remove_plot_callback, args=(plot_id,), use_container_width=True, type="secondary")
+        with col_actions:
+            if not is_collapsed:
+                a1, a2, a3, a4, a5, a6 = st.columns(6, gap="small")
+                with a1: st.button("✏️", key=f"ren_btn_{plot_id}", help="Rename", on_click=toggle_rename_callback, args=(plot_id,), use_container_width=True)
+                with a2: st.button("⬆️", key=f"up_btn_{plot_id}", help="Move Up", on_click=move_plot_callback, args=(plot_id, -1), use_container_width=True)
+                with a3: st.button("⬇️", key=f"down_btn_{plot_id}", help="Move Down", on_click=move_plot_callback, args=(plot_id, 1), use_container_width=True)
+                with a4: st.button("➕", key=f"add_btn_{plot_id}", help="Add Plot", on_click=add_plot_callback, use_container_width=True)
+                with a5: st.button("📋", key=f"dup_{plot_id}", help="Duplicate", on_click=duplicate_plot_callback, args=(plot_id,), use_container_width=True)
+                with a6: st.button("🗑️", key=f"del_btn_{plot_id}", help="Delete", on_click=remove_plot_callback, args=(plot_id,), type="secondary", use_container_width=True)
         
         # --- Content (Fragmented) ---
         # Wrapped in a container to ensure visual continuity within the bordered parent
