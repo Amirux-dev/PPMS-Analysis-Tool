@@ -266,7 +266,7 @@ def parse_multivu_content(content: str, filename: str) -> Dict[str, Any]:
                     clean_row.append(v)
                 else:
                     clean_row.append(None)
-            except:
+            except (ValueError, TypeError):
                 clean_row.append(None)
         full_data_rows.append(clean_row)
 
