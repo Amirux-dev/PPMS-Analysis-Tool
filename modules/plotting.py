@@ -376,37 +376,64 @@ def create_plot_interface(plot_id: str, available_datasets: List[Dict[str, Any]]
         
         with col_actions:
             if not is_collapsed:
-                a1, a2, a3, a4, a5, a6 = st.columns(6, gap="small")
+                # Generate unique container ID for CSS targeting
+                container_id = f"action_buttons_{plot_id}"
                 
-                # Inject CSS for each button individually using unique identifiers
+                # Inject CSS targeting buttons by position in this specific container
                 st.markdown(f"""
                 <style>
-                button[data-testid="baseButton-secondary"]:has(p:contains("⬆️")) {{
+                /* Ensure buttons have proper styling */
+                div[data-testid="stHorizontalBlock"] button {{
+                    font-size: 1.1rem !important;
+                    padding: 0.4rem 0.5rem !important;
+                    height: 38px !important;
+                    display: flex !important;
+                    align-items: center !important;
+                    justify-content: center !important;
+                    border-radius: 0.375rem !important;
+                    border: none !important;
+                }}
+                
+                /* Target buttons by their column position - child 1 = rename (blue) */
+                div[data-testid="column"]:nth-child(1) button[data-testid="baseButton-primary"] {{
+                    background-color: #4A90E2 !important;
+                    color: white !important;
+                }}
+                
+                /* child 2 = up (green) */
+                div[data-testid="column"]:nth-child(2) button[data-testid="baseButton-secondary"] {{
                     background-color: #50C878 !important;
                     color: white !important;
                 }}
-                button[data-testid="baseButton-secondary"]:has(p:contains("⬇️")) {{
+                
+                /* child 3 = down (orange) */
+                div[data-testid="column"]:nth-child(3) button[data-testid="baseButton-secondary"] {{
                     background-color: #F39C12 !important;
                     color: white !important;
                 }}
-                button[data-testid="baseButton-secondary"]:has(p:contains("➕")) {{
+                
+                /* child 4 = add (purple) */
+                div[data-testid="column"]:nth-child(4) button[data-testid="baseButton-secondary"] {{
                     background-color: #9B59B6 !important;
                     color: white !important;
                 }}
-                button[data-testid="baseButton-secondary"]:has(p:contains("📋")) {{
+                
+                /* child 5 = duplicate (light blue) */
+                div[data-testid="column"]:nth-child(5) button[data-testid="baseButton-secondary"] {{
                     background-color: #3498DB !important;
                     color: white !important;
                 }}
-                button[data-testid="baseButton-secondary"]:has(p:contains("🗑️")) {{
+                
+                /* child 6 = delete (red) */
+                div[data-testid="column"]:nth-child(6) button[data-testid="baseButton-secondary"] {{
                     background-color: #E74C3C !important;
                     color: white !important;
                 }}
-                button[data-testid="baseButton-primary"]:has(p:contains("✏️")) {{
-                    background-color: #4A90E2 !important;
-                }}
                 </style>
+                <div id="{container_id}"></div>
                 """, unsafe_allow_html=True)
                 
+                a1, a2, a3, a4, a5, a6 = st.columns(6, gap="small")
                 with a1: st.button("✏️", key=f"ren_btn_{plot_id}", help="Rename", on_click=toggle_rename_callback, args=(plot_id,), type="primary", use_container_width=True)
                 with a2: st.button("⬆️", key=f"up_btn_{plot_id}", help="Move Up", on_click=move_plot_callback, args=(plot_id, -1), type="secondary", use_container_width=True)
                 with a3: st.button("⬇️", key=f"down_btn_{plot_id}", help="Move Down", on_click=move_plot_callback, args=(plot_id, 1), type="secondary", use_container_width=True)
