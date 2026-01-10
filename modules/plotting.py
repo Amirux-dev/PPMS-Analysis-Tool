@@ -228,8 +228,8 @@ def remove_plot_callback(plot_id_str):
 def toggle_rename_callback(plot_id):
     # Save title if we are closing edit mode
     if st.session_state.get(f"ren_mode_{plot_id}", False):
-         key = f"pname_{plot_id}"
-         if key in st.session_state:
+        key = f"pname_{plot_id}"
+        if key in st.session_state:
             if 'persistent_values' not in st.session_state:
                 st.session_state['persistent_values'] = {}
             st.session_state['persistent_values'][key] = st.session_state[key]
@@ -352,7 +352,7 @@ def create_plot_interface(plot_id: str, available_datasets: List[Dict[str, Any]]
         p_col_key = f"is_collapsed_{plot_id}"
         # Sync with persistent values if present
         if 'persistent_values' in st.session_state and p_col_key in st.session_state['persistent_values']:
-             st.session_state[p_col_key] = st.session_state['persistent_values'][p_col_key]
+            st.session_state[p_col_key] = st.session_state['persistent_values'][p_col_key]
              
         is_collapsed = st.session_state.get(p_col_key, False)
         

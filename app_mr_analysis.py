@@ -880,8 +880,8 @@ if len(plot_indices) > 1:
         )
     with col_nav_2:
         if selected_nav_idx is not None:
-             target_id = nav_options[selected_nav_idx][0]
-             st.link_button("Go ➡️", url=f"#plot_{target_id}", help=f"Scroll to {nav_options[selected_nav_idx][1]}", use_container_width=True)
+            target_id = nav_options[selected_nav_idx][0]
+            st.link_button("Go ➡️", url=f"#plot_{target_id}", help=f"Scroll to {nav_options[selected_nav_idx][1]}", use_container_width=True)
 
 # Create rows
 rows = [plot_indices[i:i + num_cols] for i in range(0, len(plot_indices), num_cols)]
