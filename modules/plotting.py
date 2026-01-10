@@ -43,104 +43,112 @@ def process_one_curve(
     if df.empty:
         return None, None, "", ""
 
-    if analysis_mode in ["Standard MR Analysis", "Standard R-H Analysis"]:
-        # Standard MR/RH Processing
-        
-        # 1. R0 Calculation
-        r0 = 1.0
-        try:
-            if r0_method == "First Point": 
-                r0 = df["R"].iloc[0]
-            elif r0_method == "Closest to 0T": 
-                r0 = df["R"].iloc[df["H_T"].abs().idxmin()]
-            elif r0_method == "Mean within Window":
-                mask = df["H_T"].abs() <= r0_window
-                r0 = df.loc[mask, "R"].mean() if mask.any() else df["R"].iloc[df["H_T"].abs().idxmin()]
-            elif r0_method == "Max Resistance": 
-                r0 = df["R"].max()
-        except Exception:
-            r0 = 1.0
+    try:
+        if analysis_mode in ["Standard MR Analysis", "Standard R-H Analysis"]:
+            # Check availability of standard columns
+            if "H_T" not in df.columns or "R" not in df.columns:
+                 return None, None, "", ""
 
-        # 2. X Axis
-        x_data = df["H_T"]
-        x_label = "Field (T)"
-        if x_unit == "Oersted (Oe)":
-            x_data = x_data * 10000
-            x_label = "Field (Oe)"
-
-        # 3. Y Axis
-        if y_mode == "Magnetoresistance (MR %)":
-            y_data = 100 * (df["R"] - r0) / r0
-            y_label = "MR (%)"
-        elif y_mode == "Normalized (R/R0)":
-            y_data = df["R"] / r0
-            y_label = "R / R0"
-        elif y_mode == "Derivative (dR/dH)":
-            y_data = df["R"].diff() / df["H_T"].diff()
-            y_label = "dR/dH (Ω/T)"
-            y_data = y_data.fillna(0)
-        else:
-            y_data = df["R"]
-            y_label = "Resistance (Ω)"
-
-    elif analysis_mode == "Standard R-T Analysis":
-        if temp_col_idx >= 0 and r_col_name in df.columns:
-            # Extract and Sort
-            temp_col = df.columns[temp_col_idx]
-            sub_df = pd.DataFrame({"T": df[temp_col], "R": df[r_col_name]}).dropna().sort_values("T")
+            # Standard MR/RH Processing
             
-            if not sub_df.empty:
-                x_data = sub_df["T"]
-                x_label = "Temperature (K)"
+            # 1. R0 Calculation
+            r0 = 1.0
+            try:
+                if r0_method == "First Point": 
+                    r0 = df["R"].iloc[0]
+                elif r0_method == "Closest to 0T": 
+                    r0 = df["R"].iloc[df["H_T"].abs().idxmin()]
+                elif r0_method == "Mean within Window":
+                    mask = df["H_T"].abs() <= r0_window
+                    r0 = df.loc[mask, "R"].mean() if mask.any() else df["R"].iloc[df["H_T"].abs().idxmin()]
+                elif r0_method == "Max Resistance": 
+                    r0 = df["R"].max()
+            except Exception:
+                r0 = 1.0
+    
+            # 2. X Axis
+            x_data = df["H_T"]
+            x_label = "Field (T)"
+            if x_unit == "Oersted (Oe)":
+                x_data = x_data * 10000
+                x_label = "Field (Oe)"
+    
+            # 3. Y Axis
+            if y_mode == "Magnetoresistance (MR %)":
+                y_data = 100 * (df["R"] - r0) / r0
+                y_label = "MR (%)"
+            elif y_mode == "Normalized (R/R0)":
+                y_data = df["R"] / r0
+                y_label = "R / R0"
+            elif y_mode == "Derivative (dR/dH)":
+                y_data = df["R"].diff() / df["H_T"].diff()
+                y_label = "dR/dH (Ω/T)"
+                y_data = y_data.fillna(0)
+            else:
+                y_data = df["R"]
+                y_label = "Resistance (Ω)"
+    
+        elif analysis_mode == "Standard R-T Analysis":
+            if temp_col_idx >= 0 and r_col_name in df.columns:
+                # Extract and Sort
+                temp_col = df.columns[temp_col_idx]
+                sub_df = pd.DataFrame({"T": df[temp_col], "R": df[r_col_name]}).dropna().sort_values("T")
                 
-                if y_mode == "Resistance (Ω)":
-                    y_data = sub_df["R"]
-                    y_label = "Resistance (Ω)"
-                elif y_mode == "Normalized (R/R_300K)":
-                    try:
-                         # Find closest to 300
-                         r_300 = sub_df.loc[(sub_df["T"] - 300).abs().idxmin(), "R"]
-                    except:
-                         r_300 = 1.0
-                    y_data = sub_df["R"] / r_300
-                    y_label = "R / R(300K)"
-                elif y_mode == "Derivative (dR/dT)":
-                    y_data = (sub_df["R"].diff() / sub_df["T"].diff()).fillna(0)
-                    y_label = "dR/dT (Ω/K)"
-
-    else: # Custom Columns
-        # Helper to get col data
-        def get_col_data(col_name, dframe):
-            if not col_name: return None, None
-            if col_name == "Magnetic Field (T)":
-                for c in dframe.columns:
-                    if "Oe" in c or "Oersted" in c: return dframe[c] * 1e-4, "Magnetic Field (T)"
+                if not sub_df.empty:
+                    x_data = sub_df["T"]
+                    x_label = "Temperature (K)"
+                    
+                    if y_mode == "Resistance (Ω)":
+                        y_data = sub_df["R"]
+                        y_label = "Resistance (Ω)"
+                    elif y_mode == "Normalized (R/R_300K)":
+                        try:
+                             # Find closest to 300
+                             r_300 = sub_df.loc[(sub_df["T"] - 300).abs().idxmin(), "R"]
+                        except:
+                             r_300 = 1.0
+                        y_data = sub_df["R"] / r_300
+                        y_label = "R / R(300K)"
+                    elif y_mode == "Derivative (dR/dT)":
+                        y_data = (sub_df["R"].diff() / sub_df["T"].diff()).fillna(0)
+                        y_label = "dR/dT (Ω/K)"
+    
+        else: # Custom Columns
+            # Helper to get col data
+            def get_col_data(col_name, dframe):
+                if not col_name: return None, None
+                if col_name == "Magnetic Field (T)":
+                    for c in dframe.columns:
+                        if "Oe" in c or "Oersted" in c: return dframe[c] * 1e-4, "Magnetic Field (T)"
+                    return None, None
+                elif col_name in dframe.columns: return dframe[col_name], col_name
                 return None, None
-            elif col_name in dframe.columns: return dframe[col_name], col_name
-            return None, None
-
-        x_d, x_l = get_col_data(custom_x_col, df)
-        y_d, y_l = get_col_data(custom_y_col, df)
-
-        if x_d is not None and y_d is not None:
-             # Align
-             mask = x_d.notna() & y_d.notna()
-             x_data, y_data = x_d[mask], y_d[mask]
-             x_label, y_label = x_l, y_l
-             
-             if is_derivative:
-                 # Sort by X for derivative
-                 temp_df = pd.DataFrame({'x': x_data, 'y': y_data}).sort_values('x')
+    
+            x_d, x_l = get_col_data(custom_x_col, df)
+            y_d, y_l = get_col_data(custom_y_col, df)
+    
+            if x_d is not None and y_d is not None:
+                 # Align
+                 mask = x_d.notna() & y_d.notna()
+                 x_data, y_data = x_d[mask], y_d[mask]
+                 x_label, y_label = x_l, y_l
                  
-                 deriv = temp_df['y'].diff() / temp_df['x'].diff()
-                 deriv = deriv.replace([np.inf, -np.inf], np.nan)
-                 
-                 x_data = temp_df['x']
-                 # We need to filter NaNs created by diff
-                 mask_d = deriv.notna()
-                 x_data = x_data[mask_d]
-                 y_data = deriv[mask_d]
-                 y_label = f"d({y_label})/d({x_label})"
+                 if is_derivative:
+                     # Sort by X for derivative
+                     temp_df = pd.DataFrame({'x': x_data, 'y': y_data}).sort_values('x')
+                     
+                     deriv = temp_df['y'].diff() / temp_df['x'].diff()
+                     deriv = deriv.replace([np.inf, -np.inf], np.nan)
+                     
+                     x_data = temp_df['x']
+                     # We need to filter NaNs created by diff
+                     mask_d = deriv.notna()
+                     x_data = x_data[mask_d]
+                     y_data = deriv[mask_d]
+                     y_label = f"d({y_label})/d({x_label})"
+    except Exception:
+        # Failsafe for any calculation error
+        return None, None, "", ""
 
     return x_data, y_data, x_label, y_label
 
@@ -516,16 +524,33 @@ def create_plot_interface(plot_id: str, available_datasets: List[Dict[str, Any]]
 
     if selected_datasets:
         for d in selected_datasets:
-            datasets_to_process = [(d['full_df'], "", False)] # df, suffix, is_symmetrized
+            datasets_to_process = []
             
-            # Add symmetrized copy if needed
-            if d['id'] in symmetrize_files:
-                df_sym = d['full_df'].copy()
-                if "H_T" in df_sym.columns:
-                    df_sym["H_T"] = -df_sym["H_T"]
-                    datasets_to_process.append((df_sym, " (Sym)", True))
-            
+            # Prepare standard DF if needed
+            if analysis_mode in ["Standard MR Analysis", "Standard R-H Analysis"]:
+                 if 'H_T' in d and 'R' in d:
+                      # Reconstruct standardized dataframe
+                      try:
+                          std_df = pd.DataFrame({'H_T': d['H_T'], 'R': d['R']})
+                          datasets_to_process.append((std_df, "", False))
+                      except Exception:
+                          # Fallback
+                          if 'full_df' in d: datasets_to_process.append((d['full_df'], "", False))
+                 elif 'full_df' in d:
+                      datasets_to_process.append((d['full_df'], "", False))
+            elif 'full_df' in d:
+                 datasets_to_process.append((d['full_df'], "", False))
+
+            final_datasets_to_process = []
             for df_curr, suffix, is_sym in datasets_to_process:
+                final_datasets_to_process.append((df_curr, suffix, is_sym))
+                # Add symmetrized copy if needed and we have H_T
+                if analysis_mode in ["Standard MR Analysis", "Standard R-H Analysis"] and d['id'] in symmetrize_files and not is_sym and "H_T" in df_curr.columns:
+                    df_sym = df_curr.copy()
+                    df_sym["H_T"] = -df_sym["H_T"]
+                    final_datasets_to_process.append((df_sym, " (Sym)", True))
+            
+            for df_curr, suffix, is_sym in final_datasets_to_process:
                 # Use our cached helper
                 p_x, p_y, p_lx, p_ly = process_one_curve(
                     df_curr, analysis_mode, x_axis_unit, y_axis_mode, 
