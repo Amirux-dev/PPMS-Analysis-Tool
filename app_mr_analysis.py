@@ -1,5 +1,4 @@
 import streamlit as st
-import streamlit.components.v1 as components
 import os
 import uuid
 import zipfile
@@ -860,9 +859,9 @@ if not plot_indices:
 
 # --- Quick Navigation Bar ---
 if len(plot_indices) > 1:
-    nav_col1, nav_col2 = st.columns([4, 1], vertical_alignment="bottom")
-    with nav_col1:
-        # Gather plot names
+    col_nav_1, col_nav_2 = st.columns([3, 1], vertical_alignment="bottom")
+    with col_nav_1:
+         # Gather plot names
         nav_options = []
         for pid in plot_indices:
             p_key = f"pname_{pid}"
@@ -873,34 +872,16 @@ if len(plot_indices) > 1:
             nav_options.append((pid, p_name))
             
         selected_nav_idx = st.selectbox(
-            "Quick Navigation", 
+            "📍 Jump to Plot", 
             options=range(len(nav_options)), 
-            format_func=lambda i: f"{i+1}. {nav_options[i][1]}",
-            key="nav_plot_selector"
+            format_func=lambda i: nav_options[i][1],
+            key="nav_plot_selector",
+            label_visibility="visible"
         )
-    
-    with nav_col2:
-        if st.button("Go", use_container_width=True, type="primary"):
-            if selected_nav_idx is not None:
-                target_id = nav_options[selected_nav_idx][0]
-                st.session_state['scroll_to'] = target_id
-                st.rerun()
-    
-    # Execute scroll if needed
-    if 'scroll_to' in st.session_state:
-        target_id = st.session_state.pop('scroll_to')
-        components.html(f"""
-            <script>
-                setTimeout(function() {{
-                    const element = window.parent.document.getElementById('plot_{target_id}');
-                    if (element) {{
-                        element.scrollIntoView({{ behavior: 'smooth', block: 'center' }});
-                    }}
-                }}, 300);
-            </script>
-        """, height=0)
-    
-    st.divider()
+    with col_nav_2:
+        if selected_nav_idx is not None:
+            target_id = nav_options[selected_nav_idx][0]
+            st.link_button("Go ➡️", url=f"#plot_{target_id}", help=f"Scroll to {nav_options[selected_nav_idx][1]}", use_container_width=True)
 
 # Create rows
 rows = [plot_indices[i:i + num_cols] for i in range(0, len(plot_indices), num_cols)]
